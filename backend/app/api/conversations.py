@@ -6,7 +6,7 @@ from typing import List
 
 from app.services.memory_service import (
     get_conversations, get_messages, create_conversation,
-    update_conversation_title, delete_conversation
+    update_conversation_title, delete_conversation, search_messages
 )
 
 logger = logging.getLogger(__name__)
@@ -20,8 +20,8 @@ class UpdateConvReq(BaseModel):
     title: str
 
 @router.get("/conversations")
-async def list_conversations(user_id: int):
-    return get_conversations(user_id)
+async def list_conversations(user_id: int, q: str = None):
+    return get_conversations(user_id, q)
 
 @router.post("/conversations")
 async def add_conversation(req: CreateConvReq):
@@ -42,3 +42,7 @@ async def remove_conversation(conversation_id: str):
 @router.get("/messages")
 async def fetch_messages(conversation_id: str):
     return get_messages(conversation_id)
+
+@router.get("/search/messages")
+async def search_messages_api(user_id: int, q: str):
+    return search_messages(user_id, q)

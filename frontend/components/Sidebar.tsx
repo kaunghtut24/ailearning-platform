@@ -3,6 +3,8 @@ import { useState, useRef, useEffect } from "react";
 export interface Conversation {
   id: string;
   title: string;
+  snippet?: string;
+  key?: string;
 }
 
 interface SidebarProps {
@@ -12,6 +14,7 @@ interface SidebarProps {
   onSelect: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
   onDelete: (id: string) => void;
+  onSearch: (q: string, mode: "titles" | "messages") => void;
 }
 
 export function Sidebar({
@@ -21,10 +24,20 @@ export function Sidebar({
   onSelect,
   onRename,
   onDelete,
+  onSearch,
 }: SidebarProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchMode, setSearchMode] = useState<"titles" | "messages">("titles");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onSearch(searchTerm, searchMode);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm, searchMode, onSearch]);
 
   useEffect(() => {
     if (editingId) inputRef.current?.focus();
@@ -52,6 +65,31 @@ export function Sidebar({
         </span>
       </div>
 
+      {/* Search Input */}
+      <div className="px-3 pt-3">
+        <input
+          type="text"
+          placeholder="Search..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600"
+        />
+      </div>
+
+      {/* Mode Toggle */}
+      <div className="px-3 pt-2 flex gap-2">
+        <button 
+          onClick={() => setSearchMode("titles")}
+          className={`flex-1 text-xs py-1 rounded-md transition-colors ${searchMode === "titles" ? "bg-zinc-200 dark:bg-zinc-700 font-medium text-zinc-900 dark:text-zinc-100" : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"}`}>
+          Titles
+        </button>
+        <button 
+          onClick={() => setSearchMode("messages")}
+          className={`flex-1 text-xs py-1 rounded-md transition-colors ${searchMode === "messages" ? "bg-zinc-200 dark:bg-zinc-700 font-medium text-zinc-900 dark:text-zinc-100" : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"}`}>
+          Messages
+        </button>
+      </div>
+
       {/* New Chat button */}
       <div className="px-3 pt-3 pb-2">
         <button
@@ -74,7 +112,7 @@ export function Sidebar({
         ) : (
           conversations.map((conv) => (
             <div
-              key={conv.id}
+              key={conv.key || conv.id}
               onClick={() => onSelect(conv.id)}
               className={`group w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between cursor-pointer transition-colors ${
                 conv.id === activeId
@@ -97,9 +135,16 @@ export function Sidebar({
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
-                <div className="flex items-center min-w-0 flex-1" title={conv.title}>
-                  <span aria-hidden="true" className="mr-1.5 shrink-0">💬</span>
-                  <span className="truncate">{conv.title}</span>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <div className="flex items-center" title={conv.title}>
+                    <span aria-hidden="true" className="mr-1.5 shrink-0">💬</span>
+                    <span className="truncate flex-1">{conv.title}</span>
+                  </div>
+                  {conv.snippet && (
+                    <div className="text-xs text-zinc-500 mt-1 pl-6 overflow-hidden max-h-[2.4em] leading-[1.2em]" title={conv.snippet}>
+                      {conv.snippet}
+                    </div>
+                  )}
                 </div>
               )}
               

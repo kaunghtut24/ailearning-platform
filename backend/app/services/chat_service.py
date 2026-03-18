@@ -5,6 +5,7 @@ from app.agents.instructor_agent import InstructorAgent
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.level_service import detect_level
 from app.services.memory_service import add_message, get_history, create_conversation
+from app.services.ai_service import generate_title
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ async def chat_service(req: ChatRequest) -> ChatResponse:
     7. Return ChatResponse (including conversation_id so client can continue the session)
     """
     # 1. Resolve conversation — use provided ID or start a fresh session
+    is_new = req.conversation_id is None
     conversation_id = req.conversation_id or str(uuid.uuid4())
 
     logger.info(
@@ -37,8 +39,9 @@ async def chat_service(req: ChatRequest) -> ChatResponse:
     # 2. Fetch history for this specific conversation
     history = get_history(req.user_id, conversation_id)
 
-    # Create conversation implicitly (it uses INSERT OR IGNORE, safe to call)
-    create_conversation(req.user_id, conversation_id, req.message[:50])
+    if is_new:
+        title = await generate_title(req.message)
+        create_conversation(req.user_id, conversation_id, title)
 
     # 3. Store user message
     add_message(req.user_id, conversation_id, "user", req.message)

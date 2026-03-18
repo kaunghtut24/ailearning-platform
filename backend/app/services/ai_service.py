@@ -125,3 +125,25 @@ async def generate_response(
             "Please try again in a moment."
         )
 
+async def generate_title(message: str) -> str:
+    """
+    Generate a short summary title for a new conversation based on the first message.
+    """
+    fallback_title = message[:50]
+    if not GEMINI_API_KEY:
+        return fallback_title
+
+    prompt = f"Summarize this question into a short title (max 5 words): {message}"
+    model = genai.GenerativeModel(model_name=GEMINI_MODEL)
+    loop = asyncio.get_running_loop()
+    try:
+        response = await loop.run_in_executor(
+            None,
+            lambda: model.generate_content(prompt),
+        )
+        title = response.text.strip().replace('"', '')
+        return title if title else fallback_title
+    except Exception as exc:
+        logger.error("[ai_service] generate_title failed: %s", exc)
+        return fallback_title
+

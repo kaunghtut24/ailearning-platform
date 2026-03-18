@@ -56,13 +56,21 @@ def create_conversation(user_id: int, conversation_id: str, title: str) -> None:
     conn.close()
     logger.info("[memory] create_conversation user_id=%s conversation_id=%s title=%s", user_id, conversation_id, title)
 
-def get_conversations(user_id: int) -> list:
-    """Fetch all conversations for a specific user."""
+def get_conversations(user_id: int, query: str = None) -> list:
+    """Fetch all conversations for a specific user. Filters by title if query is provided."""
     conn = get_db()
-    cursor = conn.execute(
-        "SELECT id, user_id, title, created_at FROM conversations WHERE user_id = ? ORDER BY created_at DESC",
-        (user_id,)
-    )
+    
+    if query:
+        cursor = conn.execute(
+            "SELECT id, user_id, title, created_at FROM conversations WHERE user_id = ? AND title LIKE ? ORDER BY created_at DESC",
+            (user_id, f"%{query}%")
+        )
+    else:
+        cursor = conn.execute(
+            "SELECT id, user_id, title, created_at FROM conversations WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,)
+        )
+        
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
@@ -89,6 +97,23 @@ def get_messages(conversation_id: str) -> list:
     cursor = conn.execute(
         "SELECT id, conversation_id, role, content, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
         (conversation_id,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def search_messages(user_id: int, query: str) -> list:
+    """Search deeply through message content across all conversations."""
+    conn = get_db()
+    cursor = conn.execute(
+        """
+        SELECT m.conversation_id, m.content, c.title
+        FROM messages m
+        JOIN conversations c ON m.conversation_id = c.id
+        WHERE c.user_id = ? AND m.content LIKE ?
+        ORDER BY m.created_at DESC
+        """,
+        (user_id, f"%{query}%")
     )
     rows = cursor.fetchall()
     conn.close()

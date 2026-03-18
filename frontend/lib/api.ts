@@ -46,8 +46,12 @@ export interface StoredMessage {
   created_at: string;
 }
 
-export async function getConversations(userId: number): Promise<Conversation[]> {
-  const res = await fetch(`${API_BASE}/api/conversations?user_id=${userId}`);
+export async function getConversations(userId: number, q?: string): Promise<Conversation[]> {
+  const url = new URL(`${API_BASE}/api/conversations`);
+  url.searchParams.append("user_id", userId.toString());
+  if (q) url.searchParams.append("q", q);
+  
+  const res = await fetch(url.toString());
   if (!res.ok) throw new Error("Failed to fetch conversations");
   return res.json();
 }
@@ -73,6 +77,22 @@ export async function deleteConversation(id: string) {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete conversation");
+  return res.json();
+}
+
+export interface MessageSearchResult {
+  conversation_id: string;
+  content: string;
+  title: string;
+}
+
+export async function searchMessages(userId: number, q: string): Promise<MessageSearchResult[]> {
+  const url = new URL(`${API_BASE}/api/search/messages`);
+  url.searchParams.append("user_id", userId.toString());
+  url.searchParams.append("q", q);
+  
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error("Failed to search messages");
   return res.json();
 }
 
