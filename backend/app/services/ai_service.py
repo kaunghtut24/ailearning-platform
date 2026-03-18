@@ -39,6 +39,17 @@ for _level, _filename in _LEVEL_FILES.items():
     )
     logger.info("[ai_service] Loaded prompt — level=%s file=%s", _level, _filename)
 
+# Log startup mode so it is immediately visible in the server console
+if GEMINI_API_KEY:
+    logger.info(
+        "[ai_service] REAL MODE — Gemini API key present, model=%s", GEMINI_MODEL
+    )
+else:
+    logger.warning(
+        "[ai_service] MOCK MODE — GEMINI_API_KEY not set; "
+        "add it to backend/.env to enable real responses"
+    )
+
 
 def build_prompt(history: list[str], message: str) -> str:
     """
@@ -98,10 +109,19 @@ async def generate_response(
     )
     model = _models[resolved_level]
     loop = asyncio.get_running_loop()
-    response = await loop.run_in_executor(
-        None,
-        lambda: model.generate_content(prompt),
-    )
-    logger.info("[ai_service] Gemini response received")
-    return response.text
+    try:
+        response = await loop.run_in_executor(
+            None,
+            lambda: model.generate_content(prompt),
+        )
+        logger.info("[ai_service] Gemini response received")
+        return response.text
+    except Exception as exc:
+        logger.error(
+            "[ai_service] Gemini call failed — %s: %s", type(exc).__name__, exc
+        )
+        return (
+            "I'm having trouble reaching the AI service right now. "
+            "Please try again in a moment."
+        )
 
