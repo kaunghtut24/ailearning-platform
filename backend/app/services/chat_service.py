@@ -1,0 +1,39 @@
+import logging
+
+from app.agents.instructor_agent import InstructorAgent
+from app.schemas.chat import ChatRequest, ChatResponse
+from app.services.memory_service import add_message, get_history
+
+logger = logging.getLogger(__name__)
+
+# Single shared agent instance — stateless by design (spec §6)
+_agent = InstructorAgent()
+
+
+async def chat_service(req: ChatRequest) -> ChatResponse:
+    """
+    Orchestrates the full chat flow (spec §7):
+
+    1. Fetch history from memory_service
+    2. Store the incoming user message
+    3. Delegate to InstructorAgent (agent calls ai_service)
+    4. Store the AI response
+    5. Return ChatResponse
+    """
+    logger.info("[chat_service] user_id=%s message=%r", req.user_id, req.message)
+
+    # 1. Fetch history
+    history = get_history(req.user_id)
+
+    # 2. Store user message
+    add_message(req.user_id, f"User: {req.message}")
+
+    # 3. Run agent — memory and level passed as data; never accessed inside agent (spec §8)
+    result = await _agent.run({"message": req.message, "history": history, "level": req.level})
+
+    # 4. Store AI response
+    add_message(req.user_id, f"AI: {result['response']}")
+
+    logger.info("[chat_service] done — user_id=%s", req.user_id)
+    return ChatResponse(response=result["response"])
+
