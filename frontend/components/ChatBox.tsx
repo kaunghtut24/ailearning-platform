@@ -14,17 +14,29 @@ interface Message {
   streaming?: boolean; // true while words are being appended
 }
 
+interface ChatBoxProps {
+  /** Active conversation ID (null = no conversation started yet). */
+  conversationId: string | null;
+  /** Notify parent when the conversation ID is resolved/confirmed. */
+  setConversationId: (id: string) => void;
+  /** Notify parent when the very first message is sent so it can register the session. */
+  onNewConversation: (id: string, title: string) => void;
+}
+
 const USER_ID = 1;
+/** Max characters to use from the first message as the conversation title. */
+const TITLE_MAX_CHARS = 40;
 
-
-export default function ChatBox() {
+export default function ChatBox({
+  conversationId,
+  setConversationId,
+  onNewConversation,
+}: ChatBoxProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [level, setLevel] = useState<Level>("primary");
   const [loading, setLoading] = useState(false); // true while waiting for API
   const [error, setError] = useState<string | null>(null);
-  // null until the first message is sent; then fixed for the lifetime of this session
-  const [conversationId, setConversationId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -46,8 +58,19 @@ export default function ChatBox() {
 
     // Generate a conversation ID on the very first message of this session.
     // All subsequent messages reuse the same ID so the backend keeps one history.
+    const isNew = conversationId === null;
     const cid = conversationId ?? crypto.randomUUID();
-    if (!conversationId) setConversationId(cid);
+
+    // Register the new session in the sidebar immediately (before the API call)
+    // using the first user message as the title, truncated to TITLE_MAX_CHARS.
+    if (isNew) {
+      const title =
+        text.length > TITLE_MAX_CHARS
+          ? text.slice(0, TITLE_MAX_CHARS).trimEnd() + "…"
+          : text;
+      onNewConversation(cid, title);
+      setConversationId(cid);
+    }
 
     const userMsg: Message = { id: Date.now(), role: "user", text };
     setMessages((prev) => [...prev, userMsg]);
@@ -90,7 +113,7 @@ export default function ChatBox() {
   }
 
   return (
-    <div className="flex flex-col h-screen max-w-2xl mx-auto">
+    <div className="flex flex-col h-full max-w-2xl mx-auto">
       {/* Header */}
       <div className="border-b border-zinc-200 dark:border-zinc-700 px-4 py-3 flex items-center justify-between gap-4">
         {/* Left: title + subtitle */}
