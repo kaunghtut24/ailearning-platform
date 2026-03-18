@@ -1,15 +1,9 @@
 import logging
 
+from app.agents.base_agent import BaseAgent
 from app.services.ai_service import generate_response
 
 logger = logging.getLogger(__name__)
-
-
-class BaseAgent:
-    """Spec §6 — all agents must implement this interface."""
-
-    async def run(self, input_data: dict) -> dict:
-        raise NotImplementedError
 
 
 class InstructorAgent(BaseAgent):

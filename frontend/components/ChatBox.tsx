@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { sendMessage } from "@/lib/api";
+import { sendMessage, type Level } from "@/lib/api";
+import { useStreamingText } from "@/hooks/useStreamingText";
+import { MessageBubble } from "@/components/MessageBubble";
 
 type Role = "user" | "ai";
 
@@ -13,62 +15,28 @@ interface Message {
 }
 
 const USER_ID = 1;
-const WORD_INTERVAL_MS = 55; // delay between each word appearing
-
-type Level = "primary" | "middle" | "secondary";
 
 
 export default function ChatBox() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [level, setLevel] = useState<Level>("primary");
-  const [loading, setLoading] = useState(false);   // true while waiting for API
-  const [streaming, setStreaming] = useState(false); // true while animating words
+  const [loading, setLoading] = useState(false); // true while waiting for API
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const { streaming, startStreaming } = useStreamingText(setMessages, () =>
+    inputRef.current?.focus(),
+  );
 
   // Disable input + send during both API wait and word animation
   const busy = loading || streaming;
-
-  // Clean up any running interval on unmount
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, []);
 
   // Auto-scroll whenever messages change or loading state toggles
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
-
-  /** Append words one-by-one into the AI message placeholder. */
-  function startStreaming(aiMsgId: number, fullText: string) {
-    const words = fullText.split(" ");
-    let wordIndex = 0;
-    setStreaming(true);
-
-    intervalRef.current = setInterval(() => {
-      wordIndex++;
-      const partial = words.slice(0, wordIndex).join(" ");
-      const done = wordIndex >= words.length;
-
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === aiMsgId ? { ...m, text: partial, streaming: !done } : m
-        )
-      );
-
-      if (done) {
-        clearInterval(intervalRef.current!);
-        intervalRef.current = null;
-        setStreaming(false);
-        inputRef.current?.focus();
-      }
-    }, WORD_INTERVAL_MS);
-  }
 
   async function handleSend() {
     const text = input.trim();
@@ -154,24 +122,12 @@ export default function ChatBox() {
         )}
 
         {messages.map((msg) => (
-          <div
+          <MessageBubble
             key={msg.id}
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
-                msg.role === "user"
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 rounded-br-sm"
-                  : "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100 rounded-bl-sm"
-              }`}
-            >
-              {msg.text}
-              {/* Blinking cursor shown while this bubble is streaming */}
-              {msg.streaming && (
-                <span className="inline-block w-[2px] h-[1em] bg-current align-middle ml-0.5 animate-pulse" />
-              )}
-            </div>
-          </div>
+            role={msg.role}
+            text={msg.text}
+            streaming={msg.streaming}
+          />
         ))}
 
         {/* Phase A indicator: shown while waiting for the API to respond */}

@@ -1,9 +1,11 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+export type Level = "primary" | "middle" | "secondary";
+
 export interface ChatPayload {
   user_id: number;
   message: string;
-  level?: "primary" | "middle" | "secondary";
+  level?: Level;
 }
 
 export interface ChatResult {

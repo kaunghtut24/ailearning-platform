@@ -26,12 +26,31 @@ genai.configure(api_key=GEMINI_API_KEY)
 # Pre-load prompts and instantiate one GenerativeModel per level
 _models: dict[str, genai.GenerativeModel] = {}
 for _level, _filename in _LEVEL_FILES.items():
-    _prompt = (_PROMPTS_DIR / _filename).read_text(encoding="utf-8").strip()
+    try:
+        _prompt = (_PROMPTS_DIR / _filename).read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        raise RuntimeError(
+            f"[ai_service] Missing prompt file: {_filename} "
+            f"(expected at {_PROMPTS_DIR / _filename})"
+        ) from None
     _models[_level] = genai.GenerativeModel(
         model_name=GEMINI_MODEL,
         system_instruction=_prompt,
     )
     logger.info("[ai_service] Loaded prompt — level=%s file=%s", _level, _filename)
+
+
+def build_prompt(history: list[str], message: str) -> str:
+    """
+    Combine prior conversation turns with the new user message.
+
+    Format:
+        [history turn 0]
+        ...
+        User: <message>
+    """
+    prior = "\n".join(history)
+    return f"{prior}\nUser: {message}" if prior else f"User: {message}"
 
 
 async def generate_response(
@@ -68,8 +87,7 @@ async def generate_response(
 
     # Combine history turns + new user message into the conversation body
     history = history or []
-    prior = "\n".join(history)
-    prompt = f"{prior}\nUser: {message}" if prior else f"User: {message}"
+    prompt = build_prompt(history, message)
 
     logger.info(
         "[ai_service] Calling Gemini — model=%s level=%s prompt_file=%s history_turns=%d",
