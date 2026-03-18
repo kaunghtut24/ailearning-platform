@@ -23,6 +23,8 @@ export default function ChatBox() {
   const [level, setLevel] = useState<Level>("primary");
   const [loading, setLoading] = useState(false); // true while waiting for API
   const [error, setError] = useState<string | null>(null);
+  // null until the first message is sent; then fixed for the lifetime of this session
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -42,6 +44,11 @@ export default function ChatBox() {
     const text = input.trim();
     if (!text || busy) return;
 
+    // Generate a conversation ID on the very first message of this session.
+    // All subsequent messages reuse the same ID so the backend keeps one history.
+    const cid = conversationId ?? crypto.randomUUID();
+    if (!conversationId) setConversationId(cid);
+
     const userMsg: Message = { id: Date.now(), role: "user", text };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
@@ -50,7 +57,15 @@ export default function ChatBox() {
 
     try {
       // Phase A: fetch — "AI is typing…" shown via loading state
-      const result = await sendMessage({ user_id: USER_ID, message: text, level });
+      const result = await sendMessage({
+        user_id: USER_ID,
+        message: text,
+        level,
+        conversation_id: cid,
+      });
+
+      // Keep our local ID in sync with whatever the backend confirmed
+      setConversationId(result.conversation_id);
 
       // Phase B: stream — add empty placeholder, then animate words into it
       const aiMsgId = Date.now() + 1;

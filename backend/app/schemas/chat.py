@@ -15,8 +15,18 @@ class ChatRequest(BaseModel):
             "Omit to let the system auto-detect from the message."
         ),
     )
+    conversation_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Conversation session ID. Pass the value returned by the previous response "
+            "to continue an existing conversation. Omit to start a new one."
+        ),
+    )
 
 
 class ChatResponse(BaseModel):
     response: str = Field(..., description="AI teacher's response")
+    conversation_id: str = Field(
+        ..., description="Conversation session ID — echo back in subsequent requests"
+    )
 

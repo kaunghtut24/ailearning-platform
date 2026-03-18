@@ -16,6 +16,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
 
     - **user_id**: the ID of the student sending the message
     - **message**: the question or text to send to the AI teacher
+    - **conversation_id**: (optional) continue an existing session; omit to start a new one
     """
     logger.info("[chat] Received request — user_id=%s", req.user_id)
     try:

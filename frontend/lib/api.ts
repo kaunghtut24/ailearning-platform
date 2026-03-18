@@ -6,10 +6,14 @@ export interface ChatPayload {
   user_id: number;
   message: string;
   level?: Level;
+  /** Pass the value from the previous response to continue an existing session. */
+  conversation_id?: string;
 }
 
 export interface ChatResult {
   response: string;
+  /** Echo this back in the next request to keep the same conversation session. */
+  conversation_id: string;
 }
 
 export async function sendMessage(payload: ChatPayload): Promise<ChatResult> {

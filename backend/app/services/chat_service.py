@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from app.agents.instructor_agent import InstructorAgent
 from app.schemas.chat import ChatRequest, ChatResponse
@@ -15,22 +16,31 @@ async def chat_service(req: ChatRequest) -> ChatResponse:
     """
     Orchestrates the full chat flow (spec §7):
 
-    1. Fetch history from memory_service
-    2. Store the incoming user message
-    3. Resolve student level (explicit or auto-detected)
-    4. Delegate to InstructorAgent (agent calls ai_service)
-    5. Store the AI response
-    6. Return ChatResponse
+    1. Resolve conversation ID (use provided or generate a new UUID)
+    2. Fetch history from memory_service for this (user, conversation) pair
+    3. Store the incoming user message
+    4. Resolve student level (explicit or auto-detected)
+    5. Delegate to InstructorAgent (agent calls ai_service)
+    6. Store the AI response
+    7. Return ChatResponse (including conversation_id so client can continue the session)
     """
-    logger.info("[chat_service] user_id=%s message=%r", req.user_id, req.message)
+    # 1. Resolve conversation — use provided ID or start a fresh session
+    conversation_id = req.conversation_id or str(uuid.uuid4())
 
-    # 1. Fetch history
-    history = get_history(req.user_id)
+    logger.info(
+        "[chat_service] user_id=%s conversation_id=%s message=%r",
+        req.user_id,
+        conversation_id,
+        req.message,
+    )
 
-    # 2. Store user message
-    add_message(req.user_id, f"User: {req.message}")
+    # 2. Fetch history for this specific conversation
+    history = get_history(req.user_id, conversation_id)
 
-    # 3. Resolve level — use explicit value if provided, otherwise auto-detect
+    # 3. Store user message
+    add_message(req.user_id, conversation_id, f"User: {req.message}")
+
+    # 4. Resolve level — use explicit value if provided, otherwise auto-detect
     if req.level is None:
         level = detect_level(req.message)
         logger.info("[chat_service] level auto-detected — level=%s", level)
@@ -38,12 +48,14 @@ async def chat_service(req: ChatRequest) -> ChatResponse:
         level = req.level
         logger.info("[chat_service] level explicit — level=%s", level)
 
-    # 4. Run agent — memory and level passed as data; never accessed inside agent (spec §8)
+    # 5. Run agent — memory and level passed as data; never accessed inside agent (spec §8)
     result = await _agent.run({"message": req.message, "history": history, "level": level})
 
-    # 4. Store AI response
-    add_message(req.user_id, f"AI: {result['response']}")
+    # 6. Store AI response
+    add_message(req.user_id, conversation_id, f"AI: {result['response']}")
 
-    logger.info("[chat_service] done — user_id=%s", req.user_id)
-    return ChatResponse(response=result["response"])
+    logger.info(
+        "[chat_service] done — user_id=%s conversation_id=%s", req.user_id, conversation_id
+    )
+    return ChatResponse(response=result["response"], conversation_id=conversation_id)
 
