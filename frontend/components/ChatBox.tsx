@@ -9,26 +9,66 @@ interface Message {
   id: number;
   role: Role;
   text: string;
+  streaming?: boolean; // true while words are being appended
 }
 
 const USER_ID = 1;
+const WORD_INTERVAL_MS = 55; // delay between each word appearing
 
 export default function ChatBox() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);   // true while waiting for API
+  const [streaming, setStreaming] = useState(false); // true while animating words
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Auto-scroll to latest message
+  // Disable input + send during both API wait and word animation
+  const busy = loading || streaming;
+
+  // Clean up any running interval on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  // Auto-scroll whenever messages change or loading state toggles
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  /** Append words one-by-one into the AI message placeholder. */
+  function startStreaming(aiMsgId: number, fullText: string) {
+    const words = fullText.split(" ");
+    let wordIndex = 0;
+    setStreaming(true);
+
+    intervalRef.current = setInterval(() => {
+      wordIndex++;
+      const partial = words.slice(0, wordIndex).join(" ");
+      const done = wordIndex >= words.length;
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === aiMsgId ? { ...m, text: partial, streaming: !done } : m
+        )
+      );
+
+      if (done) {
+        clearInterval(intervalRef.current!);
+        intervalRef.current = null;
+        setStreaming(false);
+        inputRef.current?.focus();
+      }
+    }, WORD_INTERVAL_MS);
+  }
+
   async function handleSend() {
     const text = input.trim();
-    if (!text || loading) return;
+    if (!text || busy) return;
 
     const userMsg: Message = { id: Date.now(), role: "user", text };
     setMessages((prev) => [...prev, userMsg]);
@@ -37,16 +77,19 @@ export default function ChatBox() {
     setLoading(true);
 
     try {
+      // Phase A: fetch — "AI is typing…" shown via loading state
       const result = await sendMessage({ user_id: USER_ID, message: text });
-      const aiMsg: Message = {
-        id: Date.now() + 1,
-        role: "ai",
-        text: result.response,
-      };
-      setMessages((prev) => [...prev, aiMsg]);
+
+      // Phase B: stream — add empty placeholder, then animate words into it
+      const aiMsgId = Date.now() + 1;
+      setMessages((prev) => [
+        ...prev,
+        { id: aiMsgId, role: "ai", text: "", streaming: true },
+      ]);
+      setLoading(false);
+      startStreaming(aiMsgId, result.response);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
       setLoading(false);
       inputRef.current?.focus();
     }
@@ -90,15 +133,24 @@ export default function ChatBox() {
               }`}
             >
               {msg.text}
+              {/* Blinking cursor shown while this bubble is streaming */}
+              {msg.streaming && (
+                <span className="inline-block w-[2px] h-[1em] bg-current align-middle ml-0.5 animate-pulse" />
+              )}
             </div>
           </div>
         ))}
 
-        {/* Loading indicator */}
+        {/* Phase A indicator: shown while waiting for the API to respond */}
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-zinc-100 dark:bg-zinc-800 rounded-2xl rounded-bl-sm px-4 py-2 text-sm text-zinc-400">
-              <span className="animate-pulse">Thinking…</span>
+            <div className="bg-zinc-100 dark:bg-zinc-800 rounded-2xl rounded-bl-sm px-4 py-2 text-sm text-zinc-400 flex items-center gap-1.5">
+              <span className="text-xs">AI is typing</span>
+              <span className="flex gap-0.5">
+                <span className="w-1 h-1 rounded-full bg-zinc-400 animate-bounce [animation-delay:0ms]" />
+                <span className="w-1 h-1 rounded-full bg-zinc-400 animate-bounce [animation-delay:150ms]" />
+                <span className="w-1 h-1 rounded-full bg-zinc-400 animate-bounce [animation-delay:300ms]" />
+              </span>
             </div>
           </div>
         )}
@@ -122,12 +174,12 @@ export default function ChatBox() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Ask a question…"
-          disabled={loading}
+          disabled={busy}
           className="flex-1 rounded-full border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-4 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 outline-none focus:ring-2 focus:ring-zinc-400 disabled:opacity-50"
         />
         <button
           onClick={handleSend}
-          disabled={!input.trim() || loading}
+          disabled={!input.trim() || busy}
           className="rounded-full bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-sm font-medium text-white dark:text-zinc-900 transition-opacity hover:opacity-80 disabled:opacity-30"
         >
           Send
