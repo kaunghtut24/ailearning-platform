@@ -1,3 +1,5 @@
+import { useState, useRef, useEffect } from "react";
+
 export interface Conversation {
   id: string;
   title: string;
@@ -8,6 +10,8 @@ interface SidebarProps {
   activeId: string | null;
   onNewChat: () => void;
   onSelect: (id: string) => void;
+  onRename: (id: string, newTitle: string) => void;
+  onDelete: (id: string) => void;
 }
 
 export function Sidebar({
@@ -15,7 +19,29 @@ export function Sidebar({
   activeId,
   onNewChat,
   onSelect,
+  onRename,
+  onDelete,
 }: SidebarProps) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingId) inputRef.current?.focus();
+  }, [editingId]);
+
+  function startEdit(conv: Conversation, e: React.MouseEvent) {
+    e.stopPropagation();
+    setEditingId(conv.id);
+    setEditTitle(conv.title);
+  }
+
+  function submitEdit() {
+    if (editingId && editTitle.trim()) {
+      onRename(editingId, editTitle.trim());
+    }
+    setEditingId(null);
+  }
   return (
     <aside className="w-[250px] shrink-0 border-r border-zinc-200 dark:border-zinc-800 flex flex-col h-screen bg-zinc-50 dark:bg-zinc-900">
       {/* App brand */}
@@ -47,19 +73,58 @@ export function Sidebar({
           </p>
         ) : (
           conversations.map((conv) => (
-            <button
+            <div
               key={conv.id}
               onClick={() => onSelect(conv.id)}
-              title={conv.title}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm truncate transition-colors ${
+              className={`group w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between cursor-pointer transition-colors ${
                 conv.id === activeId
                   ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 font-medium"
                   : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
               }`}
             >
-              <span aria-hidden="true" className="mr-1.5">💬</span>
-              {conv.title}
-            </button>
+              {editingId === conv.id ? (
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onBlur={submitEdit}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") submitEdit();
+                    if (e.key === "Escape") setEditingId(null);
+                  }}
+                  className="flex-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 px-1 py-0.5 rounded outline-none w-full min-w-0"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <div className="flex items-center min-w-0 flex-1" title={conv.title}>
+                  <span aria-hidden="true" className="mr-1.5 shrink-0">💬</span>
+                  <span className="truncate">{conv.title}</span>
+                </div>
+              )}
+              
+              {!editingId && (
+                <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2 shrink-0">
+                  <button
+                    onClick={(e) => startEdit(conv, e)}
+                    className="p-1 hover:text-zinc-900 dark:hover:text-white"
+                    title="Rename"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(conv.id);
+                    }}
+                    className="p-1 hover:text-red-500"
+                    title="Delete"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              )}
+            </div>
           ))
         )}
       </nav>

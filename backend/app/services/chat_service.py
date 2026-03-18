@@ -4,7 +4,7 @@ import uuid
 from app.agents.instructor_agent import InstructorAgent
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.level_service import detect_level
-from app.services.memory_service import add_message, get_history
+from app.services.memory_service import add_message, get_history, create_conversation
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +37,11 @@ async def chat_service(req: ChatRequest) -> ChatResponse:
     # 2. Fetch history for this specific conversation
     history = get_history(req.user_id, conversation_id)
 
+    # Create conversation implicitly (it uses INSERT OR IGNORE, safe to call)
+    create_conversation(req.user_id, conversation_id, req.message[:50])
+
     # 3. Store user message
-    add_message(req.user_id, conversation_id, f"User: {req.message}")
+    add_message(req.user_id, conversation_id, "user", req.message)
 
     # 4. Resolve level — use explicit value if provided, otherwise auto-detect
     if req.level is None:
@@ -52,7 +55,7 @@ async def chat_service(req: ChatRequest) -> ChatResponse:
     result = await _agent.run({"message": req.message, "history": history, "level": level})
 
     # 6. Store AI response
-    add_message(req.user_id, conversation_id, f"AI: {result['response']}")
+    add_message(req.user_id, conversation_id, "ai", result["response"])
 
     logger.info(
         "[chat_service] done — user_id=%s conversation_id=%s", req.user_id, conversation_id

@@ -10,7 +10,9 @@ logging.basicConfig(
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.database import init_db
 from app.api.chat import router as chat_router
+from app.api.conversations import router as conv_router
 
 app = FastAPI(
     title="AI Learning Platform — Teacher Chat API",
@@ -29,10 +31,14 @@ app.add_middleware(
 )
 
 # ---------------------------------------------------------------------------
-# Routers
+# Init Database and include routers
 # ---------------------------------------------------------------------------
-app.include_router(chat_router, prefix="/api")
+@app.on_event("startup")
+def on_startup():
+    init_db()
 
+app.include_router(chat_router, prefix="/api")
+app.include_router(conv_router, prefix="/api")
 
 @app.get("/health", tags=["health"])
 async def health() -> dict:

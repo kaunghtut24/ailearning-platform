@@ -31,3 +31,48 @@ export async function sendMessage(payload: ChatPayload): Promise<ChatResult> {
   return res.json() as Promise<ChatResult>;
 }
 
+export interface Conversation {
+  id: string;
+  user_id: number;
+  title: string;
+  created_at: string;
+}
+
+export interface StoredMessage {
+  id: number;
+  conversation_id: string;
+  role: "user" | "ai";
+  content: string;
+  created_at: string;
+}
+
+export async function getConversations(userId: number): Promise<Conversation[]> {
+  const res = await fetch(`${API_BASE}/api/conversations?user_id=${userId}`);
+  if (!res.ok) throw new Error("Failed to fetch conversations");
+  return res.json();
+}
+
+export async function getMessages(conversationId: string): Promise<StoredMessage[]> {
+  const res = await fetch(`${API_BASE}/api/messages?conversation_id=${conversationId}`);
+  if (!res.ok) throw new Error("Failed to fetch messages");
+  return res.json();
+}
+
+export async function updateConversationTitle(id: string, title: string) {
+  const res = await fetch(`${API_BASE}/api/conversations/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) throw new Error("Failed to update title");
+  return res.json();
+}
+
+export async function deleteConversation(id: string) {
+  const res = await fetch(`${API_BASE}/api/conversations/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete conversation");
+  return res.json();
+}
+

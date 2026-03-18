@@ -3,15 +3,15 @@ type Role = "user" | "ai";
 interface MessageBubbleProps {
   role: Role;
   text: string;
-  streaming?: boolean;
+  isStreaming?: boolean;
 }
 
 /**
  * Renders a single chat bubble.
  * User messages are right-aligned; AI messages are left-aligned.
- * While `streaming` is true a blinking cursor is appended.
+ * While `isStreaming` is true a blinking cursor is appended.
  */
-export function MessageBubble({ role, text, streaming }: MessageBubbleProps) {
+export function MessageBubble({ role, text, isStreaming }: MessageBubbleProps) {
   return (
     <div className={`flex ${role === "user" ? "justify-end" : "justify-start"}`}>
       <div
@@ -23,7 +23,7 @@ export function MessageBubble({ role, text, streaming }: MessageBubbleProps) {
       >
         {text}
         {/* Blinking cursor shown while this bubble is streaming */}
-        {streaming && (
+        {isStreaming && (
           <span className="inline-block w-[2px] h-[1em] bg-current align-middle ml-0.5 animate-pulse" />
         )}
       </div>

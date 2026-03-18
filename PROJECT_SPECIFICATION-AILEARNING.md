@@ -314,8 +314,194 @@ ONLY BUILD:
 * Maintain clean separation of concerns
 
 ---
+## 21. 🎨 UI/UX SPECIFICATION (FRONTEND)
+
+### 21.1 🎯 PURPOSE
+
+Define UI/UX rules for building the **AI learning interface**.
+
+Goals:
+- Simple, intuitive chat experience
+- Fast interaction with AI teacher
+- Clean separation between UI and logic
+- Easy for AI agents to generate consistent frontend code
+
+---
+
+## 21.2 🧩 CORE MVP UI
+
+ONLY build:
+
+- Chat interface
+- Message input
+- Message list (user + AI)
+
+---
+
+## 21.3 📁 FRONTEND STRUCTURE
+
+```bash
+/frontend
+  /components
+    ChatBox.tsx
+    MessageBubble.tsx
+  /services
+    api.ts
+  /pages
+    index.tsx
+````
+
+---
+
+## 21.4 💬 CHAT UI COMPONENT RULES
+
+### ChatBox.tsx
+
+Responsibilities:
+
+* Manage message state
+* Handle input
+* Call backend API
+* Render message list
+
+---
+
+### MessageBubble.tsx
+
+Responsibilities:
+
+* Display single message
+* Different styles for:
+
+  * user
+  * AI
+
+---
+
+## 21.5 🔌 API INTEGRATION RULES
+
+All API calls must go through:
+
+```bash
+/services/api.ts
+```
+
+---
+
+### Example:
+
+```javascript
+export async function sendMessage(message) {
+  return fetch("http://localhost:8000/api/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      user_id: 1,
+      message
+    })
+  }).then(res => res.json());
+}
+```
+
+---
+
+## 21.6 🔄 DATA FLOW (STRICT)
+
+UI Flow:
+
+1. User types message
+2. Message added to UI immediately
+3. API request sent
+4. Response received
+5. AI message rendered
+
+---
+
+## 21.7 🎯 STATE MANAGEMENT RULES
+
+* Use `useState` for MVP
+* No global state libraries yet
+* Keep state local to ChatBox
+
+---
+
+## 21.8 🧠 MESSAGE FORMAT
+
+```ts
+type Message = {
+  role: "user" | "ai"
+  content: string
+}
+```
+
+---
+
+## 21.9 ❌ FORBIDDEN UI PATTERNS
+
+* No direct API calls inside components (except via service)
+* No business logic inside UI
+* No global state (Redux, Zustand) in MVP
+* No over-styling or complex UI libraries
+
+---
+
+## 21.10 ✅ REQUIRED UI PATTERNS
+
+* Functional components only
+* Hooks-based logic
+* Clear separation:
+
+  * UI (components)
+  * Logic (services)
+
+---
+
+## 21.11 🎨 UI DESIGN PRINCIPLES
+
+* Minimal and clean
+* Fast response feedback
+* Clear distinction:
+
+  * user messages (right)
+  * AI messages (left)
+* Input always accessible
+
+---
+
+## 21.12 🚀 MVP UI SCOPE (STRICT)
+
+ONLY:
+
+* Chat input
+* Send button
+* Message list
+
+DO NOT BUILD:
+
+* Auth system
+* Multi-page navigation
+* Complex layouts
+* Animations (yet)
+
+---
+
+## 21.13 🔁 UI DEVELOPMENT WORKFLOW
+
+1. Create component
+2. Connect API
+3. Test interaction
+4. Validate against spec
+5. Refactor if needed
+
+---
+
+# END UI/UX SPEC
+
+```
+---
 
 # ✅ END OF SPEC
 
-```
 ```

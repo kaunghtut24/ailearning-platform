@@ -8,7 +8,7 @@ const WORD_INTERVAL_MS = 55; // delay between each word appearing
 interface StreamableMessage {
   id: number;
   text: string;
-  streaming?: boolean;
+  isStreaming?: boolean;
 }
 
 type SetMessages<T extends StreamableMessage> = React.Dispatch<
@@ -53,7 +53,7 @@ export function useStreamingText<T extends StreamableMessage>(
       setMessages((prev) =>
         prev.map((m) =>
           m.id === msgId
-            ? ({ ...m, text: partial, streaming: !done } as T)
+            ? ({ ...m, text: partial, isStreaming: !done } as T)
             : m,
         ),
       );

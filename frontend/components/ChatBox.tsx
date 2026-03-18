@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { sendMessage, type Level } from "@/lib/api";
+import { sendMessage, getMessages, type Level } from "@/lib/api";
 import { useStreamingText } from "@/hooks/useStreamingText";
 import { MessageBubble } from "@/components/MessageBubble";
 
@@ -11,7 +11,7 @@ interface Message {
   id: number;
   role: Role;
   text: string;
-  streaming?: boolean; // true while words are being appended
+  isStreaming?: boolean; // true while words are being appended
 }
 
 interface ChatBoxProps {
@@ -33,6 +33,7 @@ export default function ChatBox({
   onNewConversation,
 }: ChatBoxProps) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [input, setInput] = useState("");
   const [level, setLevel] = useState<Level>("primary");
   const [loading, setLoading] = useState(false); // true while waiting for API
@@ -51,6 +52,27 @@ export default function ChatBox({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  // Load message history if conversationId is provided on mount
+  useEffect(() => {
+    if (conversationId && !isHydrated) {
+      setLoading(true);
+      getMessages(conversationId)
+        .then((msgs) => {
+          setMessages(
+            msgs.map((m) => ({
+              id: m.id,
+              role: m.role,
+              text: m.content,
+              isStreaming: false,
+            }))
+          );
+          setIsHydrated(true);
+        })
+        .catch((err) => setError(err.message))
+        .finally(() => setLoading(false));
+    }
+  }, [conversationId, isHydrated]);
 
   async function handleSend() {
     const text = input.trim();
@@ -94,7 +116,7 @@ export default function ChatBox({
       const aiMsgId = Date.now() + 1;
       setMessages((prev) => [
         ...prev,
-        { id: aiMsgId, role: "ai", text: "", streaming: true },
+        { id: aiMsgId, role: "ai", text: "", isStreaming: true },
       ]);
       setLoading(false);
       startStreaming(aiMsgId, result.response);
@@ -164,7 +186,7 @@ export default function ChatBox({
             key={msg.id}
             role={msg.role}
             text={msg.text}
-            streaming={msg.streaming}
+            isStreaming={msg.isStreaming}
           />
         ))}
 
