@@ -4,8 +4,9 @@ import uuid
 from app.agents.instructor_agent import InstructorAgent
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.level_service import detect_level
-from app.services.memory_service import add_message, get_history, create_conversation
+from app.services.memory_service import add_message, get_history, create_conversation, conversation_exists
 from app.services.ai_service import generate_title
+from app.services.student_service import get_profile, update_profile
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,6 @@ async def chat_service(req: ChatRequest) -> ChatResponse:
     7. Return ChatResponse (including conversation_id so client can continue the session)
     """
     # 1. Resolve conversation — use provided ID or start a fresh session
-    is_new = req.conversation_id is None
     conversation_id = req.conversation_id or str(uuid.uuid4())
 
     logger.info(
@@ -36,10 +36,12 @@ async def chat_service(req: ChatRequest) -> ChatResponse:
         req.message,
     )
 
-    # 2. Fetch history for this specific conversation
+    # 2. Fetch history and profile for this specific conversation flow
     history = get_history(req.user_id, conversation_id)
+    profile = get_profile(req.user_id)
 
-    if is_new:
+    if not conversation_exists(conversation_id):
+        print("Saving conversation:", conversation_id)
         title = await generate_title(req.message)
         create_conversation(req.user_id, conversation_id, title)
 
@@ -55,10 +57,13 @@ async def chat_service(req: ChatRequest) -> ChatResponse:
         logger.info("[chat_service] level explicit — level=%s", level)
 
     # 5. Run agent — memory and level passed as data; never accessed inside agent (spec §8)
-    result = await _agent.run({"message": req.message, "history": history, "level": level})
+    result = await _agent.run({"message": req.message, "history": history, "level": level, "profile": profile})
 
     # 6. Store AI response
     add_message(req.user_id, conversation_id, "ai", result["response"])
+
+    # 7. Update profile
+    update_profile(req.user_id, req.message, result["response"])
 
     logger.info(
         "[chat_service] done — user_id=%s conversation_id=%s", req.user_id, conversation_id

@@ -9,6 +9,7 @@ export default function Home() {
   const [allConversations, setAllConversations] = useState<Conversation[]>([]);
   const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   // chatKey changes only on explicit navigation so ChatBox remounts (clears messages)
   // without remounting mid-conversation when conversationId is first assigned.
   const [chatKey, setChatKey] = useState(0);
@@ -22,9 +23,26 @@ export default function Home() {
     }).catch(console.error);
   }, []);
 
+  useEffect(() => {
+    console.log("ALL:", allConversations);
+    console.log("FILTERED:", filteredConversations);
+  }, [allConversations, filteredConversations]);
+
+  useEffect(() => {
+    // Ensure activeId exists in current view, otherwise reset
+    if (activeId && !filteredConversations.find((c) => c.id === activeId)) {
+      setActiveId(null);
+    }
+  }, [filteredConversations, activeId]);
+
   const handleSearch = useCallback((q: string, mode: "titles" | "messages" = "titles") => {
     // For MVP, user_id is hardcoded to 1
-    if (mode === "titles" || !q) {
+    if (q === "") {
+        setFilteredConversations(allConversations);
+        return;
+    }
+
+    if (mode === "titles") {
       getConversations(1, q)
         .then((data) => {
           setFilteredConversations(data.map((c) => ({ id: c.id, title: c.title })));
@@ -44,7 +62,7 @@ export default function Home() {
         })
         .catch(console.error);
     }
-  }, []);
+  }, [allConversations]);
 
   function handleNewChat() {
     setActiveId(null);
@@ -96,22 +114,27 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-screen bg-white dark:bg-zinc-950">
-      <Sidebar
-        conversations={filteredConversations}
-        activeId={activeId}
-        onNewChat={handleNewChat}
-        onSelect={handleSelectConversation}
-        onRename={handleRename}
-        onDelete={handleDelete}
-        onSearch={handleSearch}
-      />
-      <main className="flex-1 min-w-0">
+    <div className="flex h-screen bg-white dark:bg-zinc-950 overflow-hidden">
+      <div className={`shrink-0 transition-all duration-300 ease-in-out ${isSidebarOpen ? "w-[250px]" : "w-0"} overflow-hidden h-full flex`}>
+        <div className="w-[250px] shrink-0 h-full">
+          <Sidebar
+            conversations={filteredConversations}
+            activeId={activeId}
+            onNewChat={handleNewChat}
+            onSelect={handleSelectConversation}
+            onRename={handleRename}
+            onDelete={handleDelete}
+            onSearch={handleSearch}
+          />
+        </div>
+      </div>
+      <main className="flex-1 min-w-0 h-full overflow-hidden">
         <ChatBox
           key={chatKey}
           conversationId={activeId}
           setConversationId={setActiveId}
           onNewConversation={handleNewConversation}
+          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         />
       </main>
     </div>

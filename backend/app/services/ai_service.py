@@ -51,7 +51,7 @@ else:
     )
 
 
-def build_prompt(history: list[str], message: str) -> str:
+def build_prompt(history: list[str], message: str, profile: str = "") -> str:
     """
     Combine prior conversation turns with the new user message.
 
@@ -61,13 +61,15 @@ def build_prompt(history: list[str], message: str) -> str:
         User: <message>
     """
     prior = "\n".join(history)
-    return f"{prior}\nUser: {message}" if prior else f"User: {message}"
+    profile_ctx = f"Student profile: {profile}\n\n" if profile else ""
+    return f"{profile_ctx}{prior}\nUser: {message}" if prior else f"{profile_ctx}User: {message}"
 
 
 async def generate_response(
     message: str,
     history: list[str] | None = None,
     level: str = DEFAULT_LEVEL,
+    profile: str = "",
 ) -> str:
     """
     Select the prompt for the given student level, combine with history +
@@ -98,7 +100,7 @@ async def generate_response(
 
     # Combine history turns + new user message into the conversation body
     history = history or []
-    prompt = build_prompt(history, message)
+    prompt = build_prompt(history, message, profile)
 
     logger.info(
         "[ai_service] Calling Gemini — model=%s level=%s prompt_file=%s history_turns=%d",

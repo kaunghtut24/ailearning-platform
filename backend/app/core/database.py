@@ -30,6 +30,13 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(conversation_id) REFERENCES conversations(id)
             );
+            
+            CREATE TABLE IF NOT EXISTS student_profiles (
+                user_id INTEGER PRIMARY KEY,
+                strengths TEXT DEFAULT '[]',
+                weaknesses TEXT DEFAULT '[]',
+                topics_learned TEXT DEFAULT '[]'
+            );
         """)
     conn.close()
     logger.info("[database] SQLite initialized.")

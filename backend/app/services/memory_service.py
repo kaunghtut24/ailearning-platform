@@ -45,6 +45,14 @@ def add_message(user_id: int, conversation_id: str, role: str, content: str) -> 
         conversation_id,
     )
 
+def conversation_exists(conversation_id: str) -> bool:
+    """Check if a conversation already exists in the database."""
+    conn = get_db()
+    cursor = conn.execute("SELECT 1 FROM conversations WHERE id = ? LIMIT 1", (conversation_id,))
+    exists = cursor.fetchone() is not None
+    conn.close()
+    return exists
+
 def create_conversation(user_id: int, conversation_id: str, title: str) -> None:
     """Create a new conversation if it does not already exist."""
     conn = get_db()

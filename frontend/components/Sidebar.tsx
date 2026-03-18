@@ -56,7 +56,7 @@ export function Sidebar({
     setEditingId(null);
   }
   return (
-    <aside className="w-[250px] shrink-0 border-r border-zinc-200 dark:border-zinc-800 flex flex-col h-screen bg-zinc-50 dark:bg-zinc-900">
+    <aside className="w-full shrink-0 border-r border-zinc-200 dark:border-zinc-800 flex flex-col h-full bg-zinc-50 dark:bg-zinc-900">
       {/* App brand */}
       <div className="px-4 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-2">
         <span className="text-xl" aria-hidden="true">🎓</span>
