@@ -15,9 +15,13 @@ interface Message {
 const USER_ID = 1;
 const WORD_INTERVAL_MS = 55; // delay between each word appearing
 
+type Level = "primary" | "middle" | "secondary";
+
+
 export default function ChatBox() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [level, setLevel] = useState<Level>("primary");
   const [loading, setLoading] = useState(false);   // true while waiting for API
   const [streaming, setStreaming] = useState(false); // true while animating words
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +82,7 @@ export default function ChatBox() {
 
     try {
       // Phase A: fetch — "AI is typing…" shown via loading state
-      const result = await sendMessage({ user_id: USER_ID, message: text });
+      const result = await sendMessage({ user_id: USER_ID, message: text, level });
 
       // Phase B: stream — add empty placeholder, then animate words into it
       const aiMsgId = Date.now() + 1;
@@ -105,11 +109,40 @@ export default function ChatBox() {
   return (
     <div className="flex flex-col h-screen max-w-2xl mx-auto">
       {/* Header */}
-      <div className="border-b border-zinc-200 dark:border-zinc-700 px-4 py-3 flex items-center gap-2">
-        <span className="text-xl">🎓</span>
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-          AI Teacher
-        </h1>
+      <div className="border-b border-zinc-200 dark:border-zinc-700 px-4 py-3 flex items-center justify-between gap-4">
+        {/* Left: title + subtitle */}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-2xl">🎓</span>
+          <div className="min-w-0">
+            <h1 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 leading-tight">
+              AI Teacher
+            </h1>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 truncate">
+              Ask anything and learn step-by-step
+            </p>
+          </div>
+        </div>
+
+        {/* Right: level selector */}
+        <div className="flex items-center gap-2 shrink-0">
+          <label
+            htmlFor="level-select"
+            className="text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap"
+          >
+            Level:
+          </label>
+          <select
+            id="level-select"
+            value={level}
+            onChange={(e) => setLevel(e.target.value as Level)}
+            disabled={busy}
+            className="rounded-full border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-3 py-1 text-xs font-medium text-zinc-800 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-zinc-400 disabled:opacity-50 cursor-pointer"
+          >
+            <option value="primary">🟢 Primary</option>
+            <option value="middle">🟡 Middle</option>
+            <option value="secondary">🔴 Secondary</option>
+          </select>
+        </div>
       </div>
 
       {/* Message list */}
