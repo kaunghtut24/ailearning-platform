@@ -29,4 +29,5 @@ class ChatResponse(BaseModel):
     conversation_id: str = Field(
         ..., description="Conversation session ID — echo back in subsequent requests"
     )
+    quiz: Optional[dict] = Field(default=None, description="Assessment quiz if generated")
 

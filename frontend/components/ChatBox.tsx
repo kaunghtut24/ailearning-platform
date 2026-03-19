@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { sendMessage, getMessages, type Level } from "@/lib/api";
 import { useStreamingText } from "@/hooks/useStreamingText";
 import { MessageBubble } from "@/components/MessageBubble";
+import QuizCard from "@/components/QuizCard";
 
 type Role = "user" | "ai";
 
@@ -41,6 +42,7 @@ export default function ChatBox({
   const [level, setLevel] = useState<Level>("primary");
   const [isThinking, setIsThinking] = useState(false); // true while waiting for API
   const [error, setError] = useState<string | null>(null);
+  const [currentQuiz, setCurrentQuiz] = useState<{ question: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -60,6 +62,7 @@ export default function ChatBox({
   useEffect(() => {
     console.log("Loading conversation:", conversationId);
     setMessages([]);
+    setCurrentQuiz(null); // Clear quiz on conversation switch
     setIsHydrated(false);
   }, [conversationId]);
 
@@ -105,14 +108,20 @@ export default function ChatBox({
       setConversationId(cid);
     }
 
-    const userMsg: Message = { id: Date.now(), role: "user", text };
-    setMessages((prev) => [...prev, userMsg]);
+    const userMsgId = Date.now();
+    const tempAiMsgId = userMsgId + 1;
+    
+    // 1. & 2. Add user message and temporary AI loading message immediately
+    const userMsg: Message = { id: userMsgId, role: "user", text };
+    const tempAiMsg: Message = { id: tempAiMsgId, role: "ai", text: "Thinking..." };
+    
+    setMessages((prev) => [...prev, userMsg, tempAiMsg]);
     setInput("");
     setError(null);
+    setCurrentQuiz(null); // Clear previous quiz when a new message is sent
     setIsThinking(true);
 
     try {
-      // Phase A: fetch — "AI is thinking…" shown via loading state
       const result = await sendMessage({
         user_id: USER_ID,
         message: text,
@@ -123,16 +132,26 @@ export default function ChatBox({
       // Keep our local ID in sync with whatever the backend confirmed
       setConversationId(result.conversation_id);
 
-      // Phase B: stream — add empty placeholder, then animate words into it
-      const aiMsgId = Date.now() + 1;
-      setMessages((prev) => [
-        ...prev,
-        { id: aiMsgId, role: "ai", text: "", isStreaming: true },
-      ]);
+      // 3. Replace "Thinking..." placeholder with the streaming state
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === tempAiMsgId
+            ? { ...msg, text: "", isStreaming: true }
+            : msg
+        )
+      );
       setIsThinking(false);
-      startStreaming(aiMsgId, result.response);
+      startStreaming(tempAiMsgId, result.response);
+
+      // Handle the quiz if present in the response
+      if (result.quiz) {
+        console.log("Received quiz:", result.quiz);
+        setCurrentQuiz(result.quiz);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
+      // If there's an error, remove the "Thinking..." placeholder
+      setMessages((prev) => prev.filter((msg) => msg.id !== tempAiMsgId));
       setIsThinking(false);
       inputRef.current?.focus();
     }
@@ -211,19 +230,6 @@ export default function ChatBox({
           />
         ))}
 
-        {/* Phase A indicator: shown while waiting for the API to respond */}
-        {isThinking && (
-          <div className="flex justify-start">
-            <div className="bg-zinc-100 dark:bg-zinc-800 rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-zinc-400 flex items-center gap-2 transition-all">
-              <span className="text-xs font-medium tracking-wide">AI is thinking...</span>
-              <span className="flex gap-1" aria-hidden="true">
-                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-[bounce_1s_infinite_0ms]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-[bounce_1s_infinite_150ms]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-[bounce_1s_infinite_300ms]" />
-              </span>
-            </div>
-          </div>
-        )}
 
         {/* Error banner */}
         {error && (
@@ -231,6 +237,11 @@ export default function ChatBox({
             ⚠️ {error}
           </div>
         )}
+
+          {/* Render the quiz card if the teacher has a follow-up check */}
+          {currentQuiz && !streaming && (
+            <QuizCard question={currentQuiz.question} />
+          )}
 
         <div ref={bottomRef} className="h-2" />
         </div>

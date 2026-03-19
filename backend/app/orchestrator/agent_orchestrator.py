@@ -1,4 +1,5 @@
 import logging
+from app.agents.assessment_agent import AssessmentAgent
 
 logger = logging.getLogger(__name__)
 
@@ -7,6 +8,7 @@ class AgentOrchestrator:
         self.memory_service = memory_service
         self.level_service = level_service
         self.instructor_agent = instructor_agent
+        self.assessment_agent = AssessmentAgent()
 
     async def process_message(self, user_id: int, message: str, level: str = None, conversation_id: str = None):
         
@@ -33,8 +35,16 @@ class AgentOrchestrator:
         # But for now let's just use the provided one or let the service handle it.
         await self.memory_service.save_message(user_id, message, response["answer"], conversation_id)
 
+        # 5. Generate a quiz question for assessment
+        quiz = await self.assessment_agent.generate_quiz(
+            topic=message,
+            level=level,
+            insights=insights
+        )
+
         return {
             "answer": response["answer"],
             "level": level,
-            "conversation_id": conversation_id
+            "conversation_id": conversation_id,
+            "quiz": quiz
         }

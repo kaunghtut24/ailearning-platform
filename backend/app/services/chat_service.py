@@ -24,5 +24,9 @@ async def chat_service(req: ChatRequest) -> ChatResponse:
     result = await _orchestrator.process_message(req.user_id, req.message, req.level, conversation_id)
     
     # Return ChatResponse
-    return ChatResponse(response=result["answer"], conversation_id=conversation_id)
+    return ChatResponse(
+        response=result["answer"],
+        conversation_id=conversation_id,
+        quiz=result.get("quiz")
+    )
 
