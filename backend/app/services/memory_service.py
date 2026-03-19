@@ -192,7 +192,7 @@ async def save_message(user_id: int, message: str, response: str, conversation_i
             conversation_id = str(uuid.uuid4())
             
     if not conversation_exists(conversation_id):
-        title = "Self-generated Title"
+        title = await ai_service.generate_title(message)
         create_conversation(user_id, conversation_id, title)
             
     add_message(user_id, conversation_id, "user", message)
