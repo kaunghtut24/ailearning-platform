@@ -37,6 +37,15 @@ def init_db():
                 weaknesses TEXT DEFAULT '[]',
                 topics_learned TEXT DEFAULT '[]'
             );
+            
+            CREATE TABLE IF NOT EXISTS learning_insights (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                topics_understood TEXT,
+                topics_struggling TEXT,
+                learning_style TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         """)
     conn.close()
     logger.info("[database] SQLite initialized.")

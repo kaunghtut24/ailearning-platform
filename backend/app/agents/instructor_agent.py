@@ -1,7 +1,8 @@
 import logging
 
 from app.agents.base_agent import BaseAgent
-from app.services.ai_service import generate_response
+from app.agents.base_agent import BaseAgent
+from app.services.ai_service import generate_response, generate
 
 logger = logging.getLogger(__name__)
 
@@ -25,21 +26,45 @@ class InstructorAgent(BaseAgent):
     """
 
     async def run(self, input_data: dict) -> dict:
-        message: str = input_data["message"]
+        question: str = input_data.get("question") or input_data.get("message", "")
         history: list[str] = input_data.get("history", [])
         level: str = input_data.get("level", "primary")
-        profile: str = input_data.get("profile", "")
+        insights: dict = input_data.get("insights", {})
 
         logger.info(
-            "[InstructorAgent] run — level=%s message=%r history_turns=%d profile_len=%d",
+            "[InstructorAgent] run with insights — level=%s question=%r history_turns=%d insights=%s",
             level,
-            message,
+            question,
             len(history),
-            len(profile),
+            insights,
         )
 
-        response = await generate_response(message, history=history, level=level, profile=profile)
+        # Build personalized prompt
+        prompt = f"""
+You are an AI teacher.
+
+Student level: {level}
+
+Student insights:
+- Struggling: {insights.get("topics_struggling", [])}
+- Strong in: {insights.get("topics_understood", [])}
+- Style: {insights.get("learning_style", "unknown")}
+
+Adapt your teaching:
+- If struggling → simplify
+- If confident → challenge
+- Match learning style
+
+Current conversation history:
+{"\n".join(history)}
+
+Question:
+{question}
+"""
+
+        # Use the general purpose generate call for the full personalized prompt
+        response = await generate(prompt)
 
         logger.info("[InstructorAgent] response ready")
-        return {"response": response}
+        return {"response": response, "answer": response}
 

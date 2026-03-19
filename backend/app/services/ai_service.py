@@ -149,3 +149,19 @@ async def generate_title(message: str) -> str:
         logger.error("[ai_service] generate_title failed: %s", exc)
         return fallback_title
 
+async def generate(prompt: str) -> str:
+    """General purpose LLM call (user-requested)."""
+    if not GEMINI_API_KEY:
+        return ""
+    
+    model = genai.GenerativeModel(model_name=GEMINI_MODEL)
+    loop = asyncio.get_running_loop()
+    try:
+        response = await loop.run_in_executor(
+            None,
+            lambda: model.generate_content(prompt),
+        )
+        return response.text
+    except Exception as exc:
+        logger.error("[ai_service] generate failed: %s", exc)
+        return ""

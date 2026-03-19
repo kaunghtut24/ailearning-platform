@@ -1,5 +1,7 @@
+import json
 import logging
 from app.core.database import get_db
+import app.services.ai_service as ai_service
 
 logger = logging.getLogger(__name__)
 
@@ -126,3 +128,113 @@ def search_messages(user_id: int, query: str) -> list:
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+async def get_conversation_history(user_id: int, conversation_id: str = None) -> list[str]:
+    """Alias for get_history (user-requested name), with optional level-agnostic retrieval."""
+    if not conversation_id:
+        # Fallback – this might need logic to pick the latest if unknown
+        # For now, just pick an empty or first one to satisfy the type.
+        convs = get_conversations(user_id)
+        if convs:
+            conversation_id = convs[0]['id']
+        else:
+            return []
+    return get_history(user_id, conversation_id)
+
+
+async def extract_learning_insights(message: str, response: str) -> dict:
+    """Analyze student behavior using AI (user-requested)."""
+    
+    prompt = f"""
+    Analyze the student's learning behavior.
+
+    Student message:
+    {message}
+
+    AI response:
+    {response}
+
+    Extract:
+    - topics_understood
+    - topics_struggling
+    - learning_style (short / long / confused / confident)
+
+    Return JSON only.
+    """
+
+    result = await ai_service.generate(prompt)
+
+    try:
+        # Basic cleanup in case JSON block markers are present
+        cleaned_result = result.strip()
+        if cleaned_result.startswith("```json"):
+            cleaned_result = cleaned_result[7:-3].strip()
+        elif cleaned_result.startswith("```"):
+            cleaned_result = cleaned_result[3:-3].strip()
+        return json.loads(cleaned_result)
+    except Exception as exc:
+        logger.error("[memory] extract_learning_insights failed: %s", exc)
+        return {
+            "topics_understood": [],
+            "topics_struggling": [],
+            "learning_style": "unknown"
+        }
+
+async def save_message(user_id: int, message: str, response: str, conversation_id: str = None) -> None:
+    """Alias for storing both user and AI message into memory – now with AI insights."""
+    import uuid
+    
+    if not conversation_id:
+        convs = get_conversations(user_id)
+        if convs:
+            conversation_id = convs[0]['id']
+        else:
+            conversation_id = str(uuid.uuid4())
+            
+    if not conversation_exists(conversation_id):
+        title = "Self-generated Title"
+        create_conversation(user_id, conversation_id, title)
+            
+    add_message(user_id, conversation_id, "user", message)
+    add_message(user_id, conversation_id, "ai", response)
+    
+    # 2 & 3. Extract and store learning insights
+    insights = await extract_learning_insights(message, response)
+    
+    conn = get_db()
+    with conn:
+        conn.execute(
+            """
+            INSERT INTO learning_insights (user_id, topics_understood, topics_struggling, learning_style)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                json.dumps(insights.get("topics_understood", [])),
+                json.dumps(insights.get("topics_struggling", [])),
+                insights.get("learning_style", "unknown")
+            )
+        )
+    conn.close()
+    logger.info("[memory] Learning insights saved for user_id=%s", user_id)
+async def get_latest_insights(user_id: int) -> dict:
+    """Fetch the most recent learning insights for a user."""
+    conn = get_db()
+    cursor = conn.execute(
+        "SELECT topics_understood, topics_struggling, learning_style FROM learning_insights WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+        (user_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row:
+        return {
+            "topics_understood": json.loads(row["topics_understood"]),
+            "topics_struggling": json.loads(row["topics_struggling"]),
+            "learning_style": row["learning_style"]
+        }
+    return {
+        "topics_understood": [],
+        "topics_struggling": [],
+        "learning_style": "unknown"
+    }
