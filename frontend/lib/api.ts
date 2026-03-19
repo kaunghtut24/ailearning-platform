@@ -60,8 +60,10 @@ export async function getConversations(userId: number, q?: string): Promise<Conv
   return res.json();
 }
 
-export async function getMessages(conversationId: string): Promise<StoredMessage[]> {
-  const res = await fetch(`${API_BASE}/api/messages?conversation_id=${conversationId}`);
+export async function getMessages(conversationId: string, signal?: AbortSignal): Promise<StoredMessage[]> {
+  const res = await fetch(`${API_BASE}/api/messages?conversation_id=${conversationId}`, {
+    signal,
+  });
   if (!res.ok) throw new Error("Failed to fetch messages");
   return res.json();
 }

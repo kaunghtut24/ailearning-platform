@@ -38,6 +38,7 @@ export default function ChatBox({
 }: ChatBoxProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isHydrating, setIsHydrating] = useState(false);
   const [input, setInput] = useState("");
   const [level, setLevel] = useState<Level>("primary");
   const [isThinking, setIsThinking] = useState(false); // true while waiting for API
@@ -45,6 +46,8 @@ export default function ChatBox({
   const [currentQuiz, setCurrentQuiz] = useState<{ question: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isSendingRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const { streaming, startStreaming } = useStreamingText(setMessages, () =>
     inputRef.current?.focus(),
@@ -58,17 +61,30 @@ export default function ChatBox({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isThinking]);
 
-  // Load message history on mount if it's an existing conversation.
-  // We use [] as the dependency array because page.tsx remounts this
-  // component completely (via chatKey) whenever the user changes chats.
+  // Load message history on conversation change
+  // Protected by isSendingRef so we don't wipe active local messages when 
+  // conversationId transitions from null -> cid during the first message response.
   useEffect(() => {
+    if (isSendingRef.current) return;
+
+    console.log("Loading conversation:", conversationId);
+    setMessages([]);
+    setCurrentQuiz(null);
+    setIsHydrated(false);
+
     if (!conversationId) {
       setIsHydrated(true);
       return;
     }
 
-    setIsThinking(true);
-    getMessages(conversationId)
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setIsHydrating(true);
+    getMessages(conversationId, controller.signal)
       .then((msgs) => {
         setMessages(
           msgs.map((m) => ({
@@ -80,14 +96,27 @@ export default function ChatBox({
         );
         setIsHydrated(true);
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setIsThinking(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      .catch((err) => {
+        if (err.name !== "AbortError") {
+          setError(err.message);
+        }
+      })
+      .finally(() => {
+        if (abortRef.current === controller) {
+          setIsHydrating(false);
+        }
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [conversationId]);
+
 
   async function handleSend() {
     const text = input.trim();
     if (!text || busy) return;
+    if (isSendingRef.current) return;
 
     // Generate a conversation ID on the very first message of this session.
     // All subsequent messages reuse the same ID so the backend keeps one history.
@@ -118,6 +147,8 @@ export default function ChatBox({
     setError(null);
     setCurrentQuiz(null); // Clear previous quiz when a new message is sent
     setIsThinking(true);
+
+    isSendingRef.current = true;
 
     try {
       const result = await sendMessage({
@@ -152,6 +183,8 @@ export default function ChatBox({
       setMessages((prev) => prev.filter((msg) => msg.id !== tempAiMsgId));
       setIsThinking(false);
       inputRef.current?.focus();
+    } finally {
+      isSendingRef.current = false;
     }
   }
 
@@ -233,6 +266,13 @@ export default function ChatBox({
         {error && (
           <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2 text-xs text-red-600 dark:text-red-400">
             ⚠️ {error}
+          </div>
+        )}
+
+        {/* Loading history indicator */}
+        {isHydrating && messages.length === 0 && (
+          <div className="flex justify-center mt-8">
+            <span className="w-5 h-5 border-2 border-zinc-300 dark:border-zinc-700 border-t-zinc-600 dark:border-t-zinc-400 rounded-full animate-spin" />
           </div>
         )}
 
