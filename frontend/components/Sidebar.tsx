@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export interface Conversation {
   id: string;
@@ -26,6 +27,7 @@ export function Sidebar({
   onDelete,
   onSearch,
 }: SidebarProps) {
+  const router = useRouter();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -192,6 +194,17 @@ export function Sidebar({
           ))
         )}
       </nav>
+
+      {/* Footer Navigation */}
+      <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 border-opacity-50 mt-auto">
+        <button
+          onClick={() => router.push("/dashboard")}
+          className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-indigo-500 dark:bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-600 dark:hover:bg-indigo-500 transition-colors shadow-sm active:scale-[0.98]"
+        >
+          <span aria-hidden="true">📊</span>
+          Dashboard
+        </button>
+      </div>
     </aside>
   );
 }
