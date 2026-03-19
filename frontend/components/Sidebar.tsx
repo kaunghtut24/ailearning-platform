@@ -68,24 +68,43 @@ export function Sidebar({
       {/* Search Input */}
       <div className="px-3 pt-3">
         <input
+          ref={inputRef}
           type="text"
-          placeholder="Search..."
+          placeholder={searchMode === "titles" ? "Search by title..." : "Search in messages..."}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600"
+          className="w-full bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600 transition-all"
         />
       </div>
 
-      {/* Mode Toggle */}
-      <div className="px-3 pt-2 flex gap-2">
+      {/* Search Mode Toggles (Advanced Filtering) */}
+      <div className="px-3 pt-2 flex items-center justify-between gap-1.5 bg-transparent rounded-lg">
         <button 
-          onClick={() => setSearchMode("titles")}
-          className={`flex-1 text-xs py-1 rounded-md transition-colors ${searchMode === "titles" ? "bg-zinc-200 dark:bg-zinc-700 font-medium text-zinc-900 dark:text-zinc-100" : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"}`}>
+          onClick={() => {
+            setSearchMode("titles");
+            inputRef.current?.focus();
+          }}
+          className={`flex-1 text-[10px] uppercase font-bold tracking-wider py-1.5 rounded-md transition-all ${
+            searchMode === "titles" 
+              ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm" 
+              : "text-zinc-500 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          }`}
+          title="Filter conversations by their titles"
+        >
           Titles
         </button>
         <button 
-          onClick={() => setSearchMode("messages")}
-          className={`flex-1 text-xs py-1 rounded-md transition-colors ${searchMode === "messages" ? "bg-zinc-200 dark:bg-zinc-700 font-medium text-zinc-900 dark:text-zinc-100" : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"}`}>
+          onClick={() => {
+            setSearchMode("messages");
+            inputRef.current?.focus();
+          }}
+          className={`flex-1 text-[10px] uppercase font-bold tracking-wider py-1.5 rounded-md transition-all ${
+            searchMode === "messages" 
+              ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm" 
+              : "text-zinc-500 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          }`}
+          title="Search for keywords inside all message history"
+        >
           Messages
         </button>
       </div>
