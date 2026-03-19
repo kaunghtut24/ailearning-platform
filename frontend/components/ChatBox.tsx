@@ -47,6 +47,9 @@ export default function ChatBox({
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isSendingRef = useRef(false);
+  // Specifically prevents useEffect wiping out the first streamed response
+  // using a boolean flag instead of ID to survive React 18 Strict Mode remounts
+  const isDynamicUpdateRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const { streaming, startStreaming } = useStreamingText(setMessages, () =>
@@ -62,10 +65,12 @@ export default function ChatBox({
   }, [messages, isThinking]);
 
   // Load message history on conversation change
-  // Protected by isSendingRef so we don't wipe active local messages when 
-  // conversationId transitions from null -> cid during the first message response.
   useEffect(() => {
-    if (isSendingRef.current) return;
+    // Prevent wiping active messages if conversationId is dynamically assigned mid-session
+    if (isDynamicUpdateRef.current) {
+      isDynamicUpdateRef.current = false;
+      return;
+    }
 
     console.log("Loading conversation:", conversationId);
     setMessages([]);
@@ -124,9 +129,11 @@ export default function ChatBox({
     const cid = conversationId ?? crypto.randomUUID();
     console.log("Sending CID:", cid);
 
-    // Register the new session in the sidebar immediately (before the API call)
-    // using the first user message as the title, truncated to TITLE_MAX_CHARS.
+    // Register the new session in the sidebar immediately
     if (isNew) {
+      // Pre-empt the useEffect from running when it receives this new ID
+      isDynamicUpdateRef.current = true;
+      
       const title =
         text.length > TITLE_MAX_CHARS
           ? text.slice(0, TITLE_MAX_CHARS).trimEnd() + "…"
