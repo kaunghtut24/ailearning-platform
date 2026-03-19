@@ -103,6 +103,7 @@ export async function searchMessages(userId: number, q: string): Promise<Message
 }
 
 export interface EvaluatePayload {
+  user_id?: number;
   question: string;
   answer: string;
 }
@@ -114,16 +115,30 @@ export interface EvaluateResult {
 }
 
 export async function evaluateAnswer(payload: EvaluatePayload): Promise<EvaluateResult> {
+  // Give explicit default for MVP
+  const finalPayload = { user_id: 1, ...payload };
   const res = await fetch(`${API_BASE}/api/evaluate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(finalPayload),
   });
 
   if (!res.ok) {
     throw new Error("Failed to evaluate answer");
   }
 
+  return res.json();
+}
+
+export interface UserStats {
+  total_points: number;
+  accuracy: number;
+  quizzes_taken: number;
+}
+
+export async function getUserStats(userId: number): Promise<UserStats> {
+  const res = await fetch(`${API_BASE}/api/stats/${userId}`);
+  if (!res.ok) throw new Error("Failed to fetch user stats");
   return res.json();
 }
 

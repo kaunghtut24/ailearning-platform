@@ -14,6 +14,7 @@ from app.core.database import init_db
 from app.api.chat import router as chat_router
 from app.api.conversations import router as conv_router
 from app.api.evaluate import router as eval_router
+from app.api.stats import router as stats_router
 
 app = FastAPI(
     title="AI Learning Platform — Teacher Chat API",
@@ -41,6 +42,7 @@ def on_startup():
 app.include_router(chat_router, prefix="/api")
 app.include_router(conv_router, prefix="/api")
 app.include_router(eval_router, prefix="/api")
+app.include_router(stats_router, prefix="/api")
 
 @app.get("/health", tags=["health"])
 async def health() -> dict:

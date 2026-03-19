@@ -46,6 +46,13 @@ def init_db():
                 learning_style TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS user_stats (
+                user_id INTEGER PRIMARY KEY,
+                total_points INTEGER DEFAULT 0,
+                total_quizzes INTEGER DEFAULT 0,
+                correct_answers INTEGER DEFAULT 0
+            );
         """)
     conn.close()
     logger.info("[database] SQLite initialized.")
