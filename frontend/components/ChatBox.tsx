@@ -58,17 +58,14 @@ export default function ChatBox({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isThinking]);
 
-  // Reset state on conversation change
+  // Load message history on mount if it's an existing conversation.
+  // We use [] as the dependency array because page.tsx remounts this
+  // component completely (via chatKey) whenever the user changes chats.
   useEffect(() => {
-    console.log("Loading conversation:", conversationId);
-    setMessages([]);
-    setCurrentQuiz(null); // Clear quiz on conversation switch
-    setIsHydrated(false);
-  }, [conversationId]);
-
-  // Load message history if conversationId is provided on mount
-  useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId) {
+      setIsHydrated(true);
+      return;
+    }
 
     setIsThinking(true);
     getMessages(conversationId)
@@ -85,7 +82,8 @@ export default function ChatBox({
       })
       .catch((err) => setError(err.message))
       .finally(() => setIsThinking(false));
-  }, [conversationId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSend() {
     const text = input.trim();
