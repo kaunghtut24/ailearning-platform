@@ -1,5 +1,6 @@
 import logging
 from app.agents.assessment_agent import AssessmentAgent
+from app.services.stats_service import get_topic_progress
 
 logger = logging.getLogger(__name__)
 
@@ -22,20 +23,34 @@ class AgentOrchestrator:
         # 3. Fetch latest insights for personalization
         insights = await self.memory_service.get_latest_insights(user_id)
 
-        # 4. Call instructor agent
+        # 4. Fetch and classify topic progress for adaptive teaching
+        raw_topics = get_topic_progress(user_id)
+        weak_topics = [
+            t["topic"] for t in raw_topics
+            if t["wrong_count"] >= t["correct_count"] and (t["wrong_count"] + t["correct_count"]) > 0
+        ]
+        strong_topics = [
+            t["topic"] for t in raw_topics
+            if t["correct_count"] > t["wrong_count"]
+        ]
+        topic_progress = {
+            "weak_topics": weak_topics,
+            "strong_topics": strong_topics,
+        }
+
+        # 5. Call instructor agent with full context
         response = await self.instructor_agent.run({
             "question": message,
             "level": level,
             "history": history,
-            "insights": insights
+            "insights": insights,
+            "topic_progress": topic_progress,
         })
 
-        # 4. Store memory (includes generating/saving conversation_id if missing)
-        # Note: We'll need to know which CID was used.
-        # But for now let's just use the provided one or let the service handle it.
+        # 6. Store memory
         await self.memory_service.save_message(user_id, message, response["answer"], conversation_id)
 
-        # 5. Generate a quiz question for assessment
+        # 7. Generate a quiz question for assessment
         quiz = await self.assessment_agent.generate_quiz(
             topic=message,
             level=level,
