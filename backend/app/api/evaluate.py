@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from app.agents.assessment_agent import AssessmentAgent
-from app.services.stats_service import update_user_stats
+from app.services.stats_service import update_user_stats, update_streak
 
 router = APIRouter()
 agent = AssessmentAgent()
@@ -23,5 +23,9 @@ async def evaluate(req: EvaluateRequest):
     
     # Save student metrics
     update_user_stats(req.user_id, score, is_correct)
+
+    # Update daily streak and include it in the response
+    current_streak = update_streak(req.user_id)
     
-    return result
+    return {**result, "streak": current_streak}
+

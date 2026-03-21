@@ -83,6 +83,13 @@ export default function QuizCard({ question }: QuizCardProps) {
                 {result.score}/10
               </span>
             </div>
+
+            {/* Streak badge — shown whenever the backend returns a streak */}
+            {result.streak != null && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 text-xs font-semibold tracking-wide animate-in fade-in duration-500">
+                🔥 {result.streak} day streak
+              </span>
+            )}
           </div>
           <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
             {result.feedback}

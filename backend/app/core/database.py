@@ -53,6 +53,13 @@ def init_db():
                 total_quizzes INTEGER DEFAULT 0,
                 correct_answers INTEGER DEFAULT 0
             );
+
+            CREATE TABLE IF NOT EXISTS user_streaks (
+                user_id INTEGER PRIMARY KEY,
+                current_streak INTEGER DEFAULT 1,
+                longest_streak INTEGER DEFAULT 1,
+                last_active_date DATE NOT NULL
+            );
         """)
     conn.close()
     logger.info("[database] SQLite initialized.")

@@ -1,4 +1,5 @@
 import logging
+from datetime import date, timedelta
 from app.core.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -53,3 +54,86 @@ def get_user_stats(user_id: int) -> dict:
         "accuracy": round(accuracy, 1),
         "quizzes_taken": total_quizzes
     }
+
+
+def update_streak(user_id: int) -> int:
+    """
+    Update the daily streak for a user and return the current streak count.
+    - New user           → streak starts at 1
+    - Already active today → no change, return current streak
+    - Active yesterday   → increment streak
+    - Gap in activity    → reset streak to 1
+    """
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+
+    conn = get_db()
+    with conn:
+        cursor = conn.execute(
+            "SELECT current_streak, longest_streak, last_active_date FROM user_streaks WHERE user_id = ?",
+            (user_id,)
+        )
+        row = cursor.fetchone()
+
+        if not row:
+            # First time — create the record with streak = 1
+            conn.execute(
+                """
+                INSERT INTO user_streaks (user_id, current_streak, longest_streak, last_active_date)
+                VALUES (?, 1, 1, ?)
+                """,
+                (user_id, today.isoformat())
+            )
+            current_streak = 1
+            logger.info(f"[streak] user_id={user_id} — new record, streak=1")
+
+        else:
+            last_active = date.fromisoformat(row["last_active_date"])
+            current_streak = row["current_streak"]
+            longest_streak = row["longest_streak"]
+
+            if last_active == today:
+                # Already counted today — nothing to do
+                logger.info(f"[streak] user_id={user_id} — already active today, streak={current_streak}")
+            elif last_active == yesterday:
+                # Consecutive day — extend the streak
+                current_streak += 1
+                longest_streak = max(longest_streak, current_streak)
+                conn.execute(
+                    """
+                    UPDATE user_streaks
+                    SET current_streak = ?, longest_streak = ?, last_active_date = ?
+                    WHERE user_id = ?
+                    """,
+                    (current_streak, longest_streak, today.isoformat(), user_id)
+                )
+                logger.info(f"[streak] user_id={user_id} — consecutive day, streak={current_streak}")
+            else:
+                # Streak broken — reset to 1
+                current_streak = 1
+                longest_streak = max(longest_streak, 1)
+                conn.execute(
+                    """
+                    UPDATE user_streaks
+                    SET current_streak = 1, longest_streak = ?, last_active_date = ?
+                    WHERE user_id = ?
+                    """,
+                    (longest_streak, today.isoformat(), user_id)
+                )
+                logger.info(f"[streak] user_id={user_id} — streak broken, reset to 1")
+
+    conn.close()
+    return current_streak
+
+
+def get_user_streak(user_id: int) -> int:
+    """Return the current streak for a user (0 if no record exists)."""
+    conn = get_db()
+    cursor = conn.execute(
+        "SELECT current_streak FROM user_streaks WHERE user_id = ?",
+        (user_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return row["current_streak"] if row else 0
+

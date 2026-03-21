@@ -112,6 +112,8 @@ export interface EvaluateResult {
   score: number;
   correct: boolean;
   feedback: string;
+  /** Current daily streak returned by the backend after evaluation */
+  streak?: number;
 }
 
 export async function evaluateAnswer(payload: EvaluatePayload): Promise<EvaluateResult> {
@@ -142,4 +144,13 @@ export async function getUserStats(userId: number): Promise<UserStats> {
   return res.json();
 }
 
+export interface UserStreak {
+  current_streak: number;
+  longest_streak: number;
+}
 
+export async function getUserStreak(userId: number): Promise<UserStreak> {
+  const res = await fetch(`${API_BASE}/api/stats/${userId}/streak`);
+  if (!res.ok) throw new Error("Failed to fetch user streak");
+  return res.json();
+}
