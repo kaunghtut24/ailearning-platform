@@ -237,3 +237,70 @@ def get_topic_progress(user_id: int) -> list[dict]:
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+
+VALID_SKILL_TYPES = {"conceptual", "factual", "problem-solving"}
+
+def update_skill_progress(user_id: int, skill_type: str, correct: bool) -> None:
+    """
+    Upsert skill-type progress for a user.
+    skill_type must be one of: conceptual | factual | problem-solving
+    Unknown types are silently ignored to avoid polluting data.
+    """
+    skill_type = skill_type.lower().strip()
+    if skill_type not in VALID_SKILL_TYPES:
+        logger.warning(f"[skill] Ignoring unknown skill_type={skill_type!r} for user_id={user_id}")
+        return
+
+    conn = get_db()
+    with conn:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO skill_progress (user_id, skill_type, correct_count, wrong_count)
+            VALUES (?, ?, 0, 0)
+            """,
+            (user_id, skill_type)
+        )
+        if correct:
+            conn.execute(
+                "UPDATE skill_progress SET correct_count = correct_count + 1 WHERE user_id = ? AND skill_type = ?",
+                (user_id, skill_type)
+            )
+        else:
+            conn.execute(
+                "UPDATE skill_progress SET wrong_count = wrong_count + 1 WHERE user_id = ? AND skill_type = ?",
+                (user_id, skill_type)
+            )
+    conn.close()
+    logger.info(f"[skill] user_id={user_id} skill_type='{skill_type}' correct={correct}")
+
+
+def get_skill_progress(user_id: int) -> list[dict]:
+    """
+    Return skill progress for all recorded skill types for a user.
+    Each row: skill_type, correct_count, wrong_count, accuracy (0-100).
+    """
+    conn = get_db()
+    cursor = conn.execute(
+        """
+        SELECT skill_type, correct_count, wrong_count
+        FROM skill_progress
+        WHERE user_id = ?
+        ORDER BY skill_type
+        """,
+        (user_id,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    result = []
+    for row in rows:
+        total = row["correct_count"] + row["wrong_count"]
+        accuracy = round(row["correct_count"] / total * 100, 1) if total > 0 else 0
+        result.append({
+            "skill_type": row["skill_type"],
+            "correct_count": row["correct_count"],
+            "wrong_count": row["wrong_count"],
+            "accuracy": accuracy,
+        })
+    return result

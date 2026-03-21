@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.services.stats_service import get_user_stats, get_topic_progress
+from app.services.stats_service import get_user_stats, get_topic_progress, get_skill_progress
 from app.core.database import get_db
 
 router = APIRouter()
@@ -32,3 +32,13 @@ async def fetch_topic_progress(user_id: int):
     """
     topics = get_topic_progress(user_id)
     return {"topics": topics}
+
+@router.get("/stats/{user_id}/skills")
+async def fetch_skill_progress(user_id: int):
+    """
+    Returns skill-type progress for a user.
+    Each entry: { skill_type, correct_count, wrong_count, accuracy }
+    skill_type is one of: conceptual | factual | problem-solving
+    """
+    skills = get_skill_progress(user_id)
+    return {"skills": skills}

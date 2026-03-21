@@ -106,6 +106,8 @@ export interface EvaluatePayload {
   user_id?: number;
   question: string;
   answer: string;
+  /** Pass the quiz's question_type so skill-type tracking stays accurate */
+  question_type?: string;
 }
 
 export interface EvaluateResult {
@@ -118,6 +120,8 @@ export interface EvaluateResult {
   reward?: number;
   /** Subject topic extracted from the question */
   topic?: string;
+  /** Skill type tracked (conceptual | factual | problem-solving) */
+  skill_type?: string;
 }
 
 export async function evaluateAnswer(payload: EvaluatePayload): Promise<EvaluateResult> {
@@ -171,4 +175,18 @@ export async function getUserTopics(userId: number): Promise<TopicProgress[]> {
   if (!res.ok) throw new Error("Failed to fetch topic progress");
   const data = await res.json();
   return data.topics as TopicProgress[];
+}
+
+export interface SkillProgress {
+  skill_type: string;
+  correct_count: number;
+  wrong_count: number;
+  accuracy: number;
+}
+
+export async function getUserSkills(userId: number): Promise<SkillProgress[]> {
+  const res = await fetch(`${API_BASE}/api/stats/${userId}/skills`);
+  if (!res.ok) throw new Error("Failed to fetch skill progress");
+  const data = await res.json();
+  return data.skills as SkillProgress[];
 }

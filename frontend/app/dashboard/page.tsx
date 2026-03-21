@@ -5,9 +5,11 @@ import {
   getUserStats,
   getUserStreak,
   getUserTopics,
+  getUserSkills,
   type UserStats,
   type UserStreak,
   type TopicProgress,
+  type SkillProgress,
 } from "@/lib/api";
 import Link from "next/link";
 
@@ -15,15 +17,17 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [streak, setStreak] = useState<UserStreak | null>(null);
   const [topics, setTopics] = useState<TopicProgress[]>([]);
+  const [skills, setSkills] = useState<SkillProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getUserStats(1), getUserStreak(1), getUserTopics(1)])
-      .then(([s, str, t]) => {
+    Promise.all([getUserStats(1), getUserStreak(1), getUserTopics(1), getUserSkills(1)])
+      .then(([s, str, t, sk]) => {
         setStats(s);
         setStreak(str);
         setTopics(t);
+        setSkills(sk);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -214,6 +218,60 @@ export default function DashboardPage() {
               )}
             </div>
 
+          </div>
+        )}
+
+        {/* 🧠 Learning Skills — only shown once there's skill data */}
+        {skills.length > 0 && (
+          <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-5">
+              <span className="text-2xl">🧠</span>
+              <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-base">Learning Skills</h3>
+            </div>
+            <ul className="space-y-4">
+              {skills.map((s) => {
+                const label =
+                  s.skill_type === "conceptual" ? "Conceptual"
+                  : s.skill_type === "factual" ? "Factual"
+                  : "Problem-Solving";
+                const icon =
+                  s.skill_type === "conceptual" ? "💡"
+                  : s.skill_type === "factual" ? "📖"
+                  : "⚙️";
+                const badge =
+                  s.accuracy >= 70
+                    ? { label: "Strong", cls: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" }
+                    : s.accuracy >= 40
+                    ? { label: "Developing", cls: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" }
+                    : { label: "Needs Practice", cls: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400" };
+                const barColor =
+                  s.accuracy >= 70 ? "bg-emerald-500"
+                  : s.accuracy >= 40 ? "bg-amber-400"
+                  : "bg-red-400";
+                return (
+                  <li key={s.skill_type} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                        <span>{icon}</span>{label}
+                      </span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>
+                        {badge.label} — {s.accuracy}%
+                      </span>
+                    </div>
+                    {/* Accuracy progress bar */}
+                    <div className="w-full h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${barColor}`}
+                        style={{ width: `${s.accuracy}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500 tabular-nums">
+                      {s.correct_count} correct · {s.wrong_count} wrong · {s.correct_count + s.wrong_count} total
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         )}
 

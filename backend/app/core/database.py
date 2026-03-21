@@ -70,6 +70,14 @@ def init_db():
                 last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(user_id, topic)
             );
+
+            CREATE TABLE IF NOT EXISTS skill_progress (
+                user_id INTEGER NOT NULL,
+                skill_type TEXT NOT NULL,
+                correct_count INTEGER DEFAULT 0,
+                wrong_count INTEGER DEFAULT 0,
+                PRIMARY KEY (user_id, skill_type)
+            );
         """)
     conn.close()
     logger.info("[database] SQLite initialized.")
