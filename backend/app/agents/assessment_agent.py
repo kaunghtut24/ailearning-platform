@@ -43,12 +43,12 @@ class AssessmentAgent:
             )
 
         prompt = f"""
-        Generate ONE short quiz question for a student.
+        You are an educational assessment generator that works across ALL subjects.
 
         ── CONTEXT ──────────────────────────────
-        Current conversation topic : {topic}
-        Quiz target topic          : {quiz_topic}
-        Student level              : {level}
+        Topic (quiz target) : {quiz_topic}
+        Original topic      : {topic}
+        Student level       : {level}
 
         ── STUDENT WEAK TOPICS (needs reinforcement) ──
 {weak_section}
@@ -56,16 +56,28 @@ class AssessmentAgent:
         ── STUDENT STRONG TOPICS (already confident) ──
 {chr(10).join(f"  - {t}" for t in strong_topics) if strong_topics else "  (none recorded yet)"}
 
-        ── INSTRUCTIONS ─────────────────────────
+        ── QUESTION TYPE RULES ──────────────────
+        Choose the right question style based on the topic nature:
+        - Conceptual topic  → ask the student to EXPLAIN or DESCRIBE
+        - Factual topic     → ask the student to RECALL a specific fact or event
+        - Problem-solving   → ask the student to APPLY knowledge to solve something
+
+        Subject examples:
+        - Math / Physics    → applied problem  (e.g. "If x = 3, what is 2x + 5?")
+        - Science / Biology → explanation      (e.g. "How does photosynthesis work?")
+        - History / Civics  → recall           (e.g. "What caused World War I?")
+        - Language / Lit    → interpretation   (e.g. "What does the author mean by...?")
+
+        ── DIFFICULTY & PRIORITY ────────────────
         {priority_instruction}
 
-        Additional rules:
-        - Ask exactly ONE question — no sub-parts
         - Keep language appropriate for level: {level}
-        - If the topic is weak → make it straightforward and conceptual
-        - If the topic is strong → make it slightly more challenging
-        - Do NOT include the answer or any hint
-        - Return ONLY the question text, nothing else
+        - If the topic is weak  → keep it foundational and clear
+        - If the topic is strong → push for deeper thinking or a harder application
+
+        ── OUTPUT ───────────────────────────────
+        Return ONLY the question text — no intro, no answer, no explanation.
+        One question. Nothing else.
         """
 
         try:
