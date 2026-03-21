@@ -1,5 +1,6 @@
 import logging
 from app.agents.assessment_agent import AssessmentAgent
+from app.agents.moderation_agent import ModerationAgent
 from app.services.stats_service import get_topic_progress
 
 logger = logging.getLogger(__name__)
@@ -10,20 +11,39 @@ class AgentOrchestrator:
         self.level_service = level_service
         self.instructor_agent = instructor_agent
         self.assessment_agent = AssessmentAgent()
+        self.moderation_agent = ModerationAgent()
 
     async def process_message(self, user_id: int, message: str, level: str = None, conversation_id: str = None):
-        
-        # 1. Fetch memory
+
+        # ── STEP 0: Moderation gate ────────────────────────────────────────────
+        # Runs before any expensive LLM calls. If flagged, return immediately.
+        classification = self.moderation_agent.classify(message)
+        if classification in ("unsafe", "off_topic"):
+            logger.info(
+                "[Orchestrator] Message blocked — classification=%s user_id=%s",
+                classification, user_id,
+            )
+            redirect = self.moderation_agent.redirect_response(classification, message)
+            return {
+                "answer": redirect["answer"],
+                "level": level or "primary",
+                "conversation_id": conversation_id,
+                "quiz": None,
+                "moderated": True,
+                "classification": classification,
+            }
+
+        # ── STEP 1: Fetch memory ───────────────────────────────────────────────
         history = await self.memory_service.get_conversation_history(user_id, conversation_id)
 
-        # 2. Detect level if not provided
+        # ── STEP 2: Detect level if not provided ──────────────────────────────
         if not level:
             level = self.level_service.detect_level(message)
 
-        # 3. Fetch latest insights for personalization
+        # ── STEP 3: Fetch latest insights for personalization ─────────────────
         insights = await self.memory_service.get_latest_insights(user_id)
 
-        # 4. Fetch and classify topic progress for adaptive teaching
+        # ── STEP 4: Classify topic progress for adaptive teaching ─────────────
         raw_topics = get_topic_progress(user_id)
         weak_topics = [
             t["topic"] for t in raw_topics
@@ -38,7 +58,7 @@ class AgentOrchestrator:
             "strong_topics": strong_topics,
         }
 
-        # 5. Call instructor agent with full context
+        # ── STEP 5: Call instructor agent with full context ───────────────────
         response = await self.instructor_agent.run({
             "question": message,
             "level": level,
@@ -47,10 +67,10 @@ class AgentOrchestrator:
             "topic_progress": topic_progress,
         })
 
-        # 6. Store memory
+        # ── STEP 6: Store memory ──────────────────────────────────────────────
         await self.memory_service.save_message(user_id, message, response["answer"], conversation_id)
 
-        # 7. Generate a quiz — biased toward weak topics when available
+        # ── STEP 7: Generate adaptive quiz biased toward weak topics ──────────
         quiz = await self.assessment_agent.generate_quiz(
             topic=message,
             level=level,
@@ -63,5 +83,7 @@ class AgentOrchestrator:
             "answer": response["answer"],
             "level": level,
             "conversation_id": conversation_id,
-            "quiz": quiz
+            "quiz": quiz,
+            "moderated": False,
+            "classification": "safe",
         }
