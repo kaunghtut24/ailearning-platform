@@ -60,6 +60,16 @@ def init_db():
                 longest_streak INTEGER DEFAULT 1,
                 last_active_date DATE NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS topic_progress (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                topic TEXT NOT NULL,
+                correct_count INTEGER DEFAULT 0,
+                wrong_count INTEGER DEFAULT 0,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, topic)
+            );
         """)
     conn.close()
     logger.info("[database] SQLite initialized.")

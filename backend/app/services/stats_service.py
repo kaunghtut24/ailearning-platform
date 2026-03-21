@@ -56,18 +56,19 @@ def get_user_stats(user_id: int) -> dict:
     }
 
 
-def update_streak(user_id: int) -> int:
+def update_streak(user_id: int) -> tuple[int, bool]:
     """
-    Update the daily streak for a user and return the current streak count.
-    - New user           → streak starts at 1
-    - Already active today → no change, return current streak
-    - Active yesterday   → increment streak
-    - Gap in activity    → reset streak to 1
+    Update the daily streak for a user and return the (current streak count, is_first_activity_today).
+    - New user           → streak starts at 1, True
+    - Already active today → no change, return current streak, False
+    - Active yesterday   → increment streak, True
+    - Gap in activity    → reset streak to 1, True
     """
     today = date.today()
     yesterday = today - timedelta(days=1)
 
     conn = get_db()
+    is_first_today = False
     with conn:
         cursor = conn.execute(
             "SELECT current_streak, longest_streak, last_active_date FROM user_streaks WHERE user_id = ?",
@@ -85,6 +86,7 @@ def update_streak(user_id: int) -> int:
                 (user_id, today.isoformat())
             )
             current_streak = 1
+            is_first_today = True
             logger.info(f"[streak] user_id={user_id} — new record, streak=1")
 
         else:
@@ -94,10 +96,12 @@ def update_streak(user_id: int) -> int:
 
             if last_active == today:
                 # Already counted today — nothing to do
+                is_first_today = False
                 logger.info(f"[streak] user_id={user_id} — already active today, streak={current_streak}")
             elif last_active == yesterday:
                 # Consecutive day — extend the streak
                 current_streak += 1
+                is_first_today = True
                 longest_streak = max(longest_streak, current_streak)
                 conn.execute(
                     """
@@ -111,6 +115,7 @@ def update_streak(user_id: int) -> int:
             else:
                 # Streak broken — reset to 1
                 current_streak = 1
+                is_first_today = True
                 longest_streak = max(longest_streak, 1)
                 conn.execute(
                     """
@@ -123,7 +128,44 @@ def update_streak(user_id: int) -> int:
                 logger.info(f"[streak] user_id={user_id} — streak broken, reset to 1")
 
     conn.close()
-    return current_streak
+    return current_streak, is_first_today
+
+
+def calculate_streak_reward(streak: int) -> int:
+    """Calculate reward points based on streak milestones."""
+    if streak == 1:
+        return 2
+    elif streak == 3:
+        return 5
+    elif streak == 7:
+        return 15
+    elif streak == 14:
+        return 30
+    else:
+        return 0
+
+
+def add_points(user_id: int, points: int):
+    """Directly add points to a user's total_points."""
+    if points <= 0:
+        return
+        
+    conn = get_db()
+    with conn:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO user_stats (user_id, total_points, total_quizzes, correct_answers)
+            VALUES (?, 0, 0, 0)
+            """,
+            (user_id,)
+        )
+        conn.execute(
+            "UPDATE user_stats SET total_points = total_points + ? WHERE user_id = ?",
+            (points, user_id)
+        )
+    conn.close()
+    logger.info(f"[stats] Added {points} reward points to user_id={user_id}")
+
 
 
 def get_user_streak(user_id: int) -> int:
@@ -137,3 +179,61 @@ def get_user_streak(user_id: int) -> int:
     conn.close()
     return row["current_streak"] if row else 0
 
+
+def update_topic_progress(user_id: int, topic: str, correct: bool) -> None:
+    """
+    Upsert topic progress for a user.
+    - Creates a new row on first encounter
+    - Increments correct_count or wrong_count accordingly
+    """
+    topic = topic.strip().title()   # normalise casing e.g. "fractions" → "Fractions"
+    conn = get_db()
+    with conn:
+        conn.execute(
+            """
+            INSERT INTO topic_progress (user_id, topic, correct_count, wrong_count, last_updated)
+            VALUES (?, ?, 0, 0, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id, topic) DO NOTHING
+            """,
+            (user_id, topic)
+        )
+        if correct:
+            conn.execute(
+                """
+                UPDATE topic_progress
+                SET correct_count = correct_count + 1, last_updated = CURRENT_TIMESTAMP
+                WHERE user_id = ? AND topic = ?
+                """,
+                (user_id, topic)
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE topic_progress
+                SET wrong_count = wrong_count + 1, last_updated = CURRENT_TIMESTAMP
+                WHERE user_id = ? AND topic = ?
+                """,
+                (user_id, topic)
+            )
+    conn.close()
+    logger.info(f"[topic] user_id={user_id} topic='{topic}' correct={correct}")
+
+
+def get_topic_progress(user_id: int) -> list[dict]:
+    """
+    Return all topic progress rows for a user ordered by total attempts (desc).
+    Each row: topic, correct_count, wrong_count, last_updated.
+    """
+    conn = get_db()
+    cursor = conn.execute(
+        """
+        SELECT topic, correct_count, wrong_count, last_updated
+        FROM topic_progress
+        WHERE user_id = ?
+        ORDER BY (correct_count + wrong_count) DESC
+        """,
+        (user_id,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]

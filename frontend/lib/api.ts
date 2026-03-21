@@ -114,6 +114,10 @@ export interface EvaluateResult {
   feedback: string;
   /** Current daily streak returned by the backend after evaluation */
   streak?: number;
+  /** Optional reward points for streak milestones */
+  reward?: number;
+  /** Subject topic extracted from the question */
+  topic?: string;
 }
 
 export async function evaluateAnswer(payload: EvaluatePayload): Promise<EvaluateResult> {
@@ -153,4 +157,18 @@ export async function getUserStreak(userId: number): Promise<UserStreak> {
   const res = await fetch(`${API_BASE}/api/stats/${userId}/streak`);
   if (!res.ok) throw new Error("Failed to fetch user streak");
   return res.json();
+}
+
+export interface TopicProgress {
+  topic: string;
+  correct_count: number;
+  wrong_count: number;
+  last_updated: string;
+}
+
+export async function getUserTopics(userId: number): Promise<TopicProgress[]> {
+  const res = await fetch(`${API_BASE}/api/stats/${userId}/topics`);
+  if (!res.ok) throw new Error("Failed to fetch topic progress");
+  const data = await res.json();
+  return data.topics as TopicProgress[];
 }

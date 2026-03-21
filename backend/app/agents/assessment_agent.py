@@ -76,3 +76,28 @@ class AssessmentAgent:
                 "correct": False,
                 "feedback": "Could not evaluate"
             }
+
+    async def extract_topic(self, question: str) -> str:
+        """
+        Extract a short topic label from a quiz question.
+        Returns a 2-4 word subject label e.g. 'Fractions', 'Algebra', 'Photosynthesis'.
+        Falls back to 'General' if the LLM fails.
+        """
+        prompt = f"""
+        What subject topic does this quiz question belong to?
+
+        Question: {question}
+
+        Reply with ONLY a short topic name (2-4 words max, e.g. "Fractions", "Cell Biology", "World War II").
+        Do NOT include any explanation or punctuation.
+        """
+        try:
+            result = await ai_service.generate(prompt)
+            topic = result.strip().strip(".")
+            # Trim to first line only in case the model added extras
+            topic = topic.splitlines()[0].strip()
+            logger.info("[AssessmentAgent] Extracted topic=%r from question", topic)
+            return topic or "General"
+        except Exception as exc:
+            logger.error("[AssessmentAgent] Failed to extract topic: %s", exc)
+            return "General"

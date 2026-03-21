@@ -1,24 +1,39 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getUserStats, getUserStreak, type UserStats, type UserStreak } from "@/lib/api";
+import {
+  getUserStats,
+  getUserStreak,
+  getUserTopics,
+  type UserStats,
+  type UserStreak,
+  type TopicProgress,
+} from "@/lib/api";
 import Link from "next/link";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [streak, setStreak] = useState<UserStreak | null>(null);
+  const [topics, setTopics] = useState<TopicProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getUserStats(1), getUserStreak(1)])
-      .then(([s, str]) => {
+    Promise.all([getUserStats(1), getUserStreak(1), getUserTopics(1)])
+      .then(([s, str, t]) => {
         setStats(s);
         setStreak(str);
+        setTopics(t);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  // Classify topics: strong = correct > wrong, weak = wrong >= correct (min 1 attempt)
+  const strongTopics = topics.filter((t) => t.correct_count > t.wrong_count);
+  const weakTopics = topics.filter(
+    (t) => t.wrong_count >= t.correct_count && t.wrong_count + t.correct_count > 0
+  );
 
   if (loading) {
     return (
@@ -39,7 +54,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 px-6 py-12 md:px-12 lg:px-24">
       <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        
+
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
@@ -50,7 +65,7 @@ export default function DashboardPage() {
               Track your gamification statistics and overall performance.
             </p>
           </div>
-          <Link 
+          <Link
             href="/"
             className="px-5 py-2.5 rounded-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap shadow-sm shadow-zinc-900/10 active:scale-95"
           >
@@ -58,7 +73,7 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {/* Streak Banner — only shown when user has an active streak */}
+        {/* Streak Banner */}
         {streak && streak.current_streak >= 2 && (
           <div className="flex items-center gap-4 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border border-orange-200 dark:border-orange-800/30 rounded-2xl px-6 py-4 animate-in fade-in slide-in-from-top-2 duration-500">
             <span className="text-4xl">🔥</span>
@@ -75,7 +90,7 @@ export default function DashboardPage() {
 
         {/* Stats Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 pt-2">
-          
+
           {/* Card 1: Total Points */}
           <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 shadow-sm flex flex-col items-center justify-center text-center gap-4 transition duration-300 hover:-translate-y-1 hover:shadow-md">
             <div className="w-16 h-16 bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-2xl flex items-center justify-center text-4xl shadow-sm">
@@ -145,8 +160,65 @@ export default function DashboardPage() {
 
         </div>
 
-        {/* Extra Motivation Block */}
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border border-indigo-100 dark:border-indigo-800/30 rounded-3xl p-8 mt-6">
+        {/* Topic Progress — only shown once there's data */}
+        {topics.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            {/* Weak Topics */}
+            <div className="bg-white dark:bg-zinc-900/50 border border-red-100 dark:border-red-900/30 rounded-3xl p-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-2xl">📉</span>
+                <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-base">Needs Practice</h3>
+              </div>
+              {weakTopics.length === 0 ? (
+                <p className="text-sm text-zinc-400 dark:text-zinc-500 italic">No weak topics yet — great job! 🎉</p>
+              ) : (
+                <ul className="space-y-2">
+                  {weakTopics.map((t) => (
+                    <li
+                      key={t.topic}
+                      className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20"
+                    >
+                      <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{t.topic}</span>
+                      <span className="text-xs text-red-500 dark:text-red-400 font-semibold tabular-nums">
+                        {t.correct_count}✓ / {t.wrong_count}✗
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Strong Topics */}
+            <div className="bg-white dark:bg-zinc-900/50 border border-emerald-100 dark:border-emerald-900/30 rounded-3xl p-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-2xl">📈</span>
+                <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-base">Strengths</h3>
+              </div>
+              {strongTopics.length === 0 ? (
+                <p className="text-sm text-zinc-400 dark:text-zinc-500 italic">Keep answering quizzes to build strengths!</p>
+              ) : (
+                <ul className="space-y-2">
+                  {strongTopics.map((t) => (
+                    <li
+                      key={t.topic}
+                      className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/20"
+                    >
+                      <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{t.topic}</span>
+                      <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">
+                        {t.correct_count}✓ / {t.wrong_count}✗
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+          </div>
+        )}
+
+        {/* Motivation Block */}
+        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border border-indigo-100 dark:border-indigo-800/30 rounded-3xl p-8">
           <div className="flex items-start gap-4">
             <span className="text-3xl">🚀</span>
             <div>
@@ -154,7 +226,7 @@ export default function DashboardPage() {
                 Keep up the great work!
               </h3>
               <p className="text-indigo-700 dark:text-indigo-400/90 mt-2 text-base leading-relaxed max-w-2xl">
-                Every question you answer helps train your brain. Remember that struggling with a concept is 
+                Every question you answer helps train your brain. Remember that struggling with a concept is
                 the first step towards mastering it. Head back to the chat to learn something new today!
               </p>
             </div>
@@ -165,4 +237,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
