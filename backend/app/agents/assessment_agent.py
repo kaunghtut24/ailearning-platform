@@ -76,8 +76,12 @@ class AssessmentAgent:
         - If the topic is strong → push for deeper thinking or a harder application
 
         ── OUTPUT ───────────────────────────────
-        Return ONLY the question text — no intro, no answer, no explanation.
-        One question. Nothing else.
+        Return your answer as valid JSON — nothing else, no markdown fences:
+        {{
+          "question": "<the quiz question>",
+          "topic": "<the specific topic being tested>",
+          "type": "conceptual | factual | problem-solving"
+        }}
         """
 
         try:
@@ -85,16 +89,24 @@ class AssessmentAgent:
                 "[AssessmentAgent] Generating quiz — quiz_topic=%r (original=%r) level=%s weak=%s",
                 quiz_topic, topic, level, weak_topics,
             )
-            question = await ai_service.generate(prompt)
+            raw = await ai_service.generate(prompt)
+            cleaned = raw.strip()
+            if cleaned.startswith("```json"):
+                cleaned = cleaned[7:].rstrip("```").strip()
+            elif cleaned.startswith("```"):
+                cleaned = cleaned[3:].rstrip("```").strip()
+            parsed = json.loads(cleaned)
             return {
-                "question": question.strip(),
-                "quiz_topic": quiz_topic,
+                "question": parsed.get("question", cleaned).strip(),
+                "quiz_topic": parsed.get("topic", quiz_topic),
+                "type": parsed.get("type", "unknown"),
             }
         except Exception as exc:
             logger.error("[AssessmentAgent] Failed to generate quiz: %s", exc)
             return {
                 "question": "Could you explain what we just talked about in your own words?",
                 "quiz_topic": quiz_topic,
+                "type": "unknown",
             }
 
 
