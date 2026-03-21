@@ -7,37 +7,84 @@ logger = logging.getLogger(__name__)
 class AssessmentAgent:
     """Agent responsible for generating short quiz questions to assess student understanding."""
 
-    async def generate_quiz(self, topic: str, level: str, insights: dict) -> dict:
-        """Generate ONE short quiz question based on topic, level, and student insights."""
-        
+    async def generate_quiz(
+        self,
+        topic: str,
+        level: str,
+        insights: dict,
+        weak_topics: list[str] | None = None,
+        strong_topics: list[str] | None = None,
+    ) -> dict:
+        """
+        Generate ONE targeted quiz question.
+
+        Topic-bias logic:
+        - If the student has weak topics → bias toward the first (most-failed) one
+        - Otherwise fall back to the current conversation topic
+        """
+        weak_topics = weak_topics or []
+        strong_topics = strong_topics or []
+
+        # Pick the quiz topic: prefer the weakest recorded topic
+        quiz_topic = weak_topics[0] if weak_topics else topic
+
+        # Build the weak-topic section for the prompt
+        if weak_topics:
+            weak_section = "\n".join(f"  - {t}" for t in weak_topics)
+            priority_instruction = (
+                "PRIORITY: Generate a question specifically about the student's WEAKEST topic "
+                f"({weak_topics[0]}). This is the topic they struggle with most. "
+                "Reinforce it with a clear, level-appropriate question."
+            )
+        else:
+            weak_section = "  (none recorded yet — quiz on the current topic)"
+            priority_instruction = (
+                f"No weak topics recorded yet. Generate a question about: {topic}"
+            )
+
         prompt = f"""
-        Generate ONE short quiz question.
+        Generate ONE short quiz question for a student.
 
-        Topic: {topic}
-        Level: {level}
+        ── CONTEXT ──────────────────────────────
+        Current conversation topic : {topic}
+        Quiz target topic          : {quiz_topic}
+        Student level              : {level}
 
-        Student struggles with:
-        {insights.get("topics_struggling", [])}
+        ── STUDENT WEAK TOPICS (needs reinforcement) ──
+{weak_section}
 
-        Rules:
-        - Simple
-        - Clear
-        - One question only
+        ── STUDENT STRONG TOPICS (already confident) ──
+{chr(10).join(f"  - {t}" for t in strong_topics) if strong_topics else "  (none recorded yet)"}
 
-        Return ONLY the question text.
+        ── INSTRUCTIONS ─────────────────────────
+        {priority_instruction}
+
+        Additional rules:
+        - Ask exactly ONE question — no sub-parts
+        - Keep language appropriate for level: {level}
+        - If the topic is weak → make it straightforward and conceptual
+        - If the topic is strong → make it slightly more challenging
+        - Do NOT include the answer or any hint
+        - Return ONLY the question text, nothing else
         """
 
         try:
-            logger.info("[AssessmentAgent] Generating quiz for topic=%s, level=%s", topic, level)
+            logger.info(
+                "[AssessmentAgent] Generating quiz — quiz_topic=%r (original=%r) level=%s weak=%s",
+                quiz_topic, topic, level, weak_topics,
+            )
             question = await ai_service.generate(prompt)
             return {
-                "question": question.strip()
+                "question": question.strip(),
+                "quiz_topic": quiz_topic,
             }
         except Exception as exc:
             logger.error("[AssessmentAgent] Failed to generate quiz: %s", exc)
             return {
-                "question": "Could you explain what we just talked about in your own words?"
+                "question": "Could you explain what we just talked about in your own words?",
+                "quiz_topic": quiz_topic,
             }
+
 
     async def evaluate_answer(self, question: str, answer: str) -> dict:
         """Evaluate the student's answer and return score, correctness, and feedback."""

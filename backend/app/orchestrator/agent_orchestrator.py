@@ -50,11 +50,13 @@ class AgentOrchestrator:
         # 6. Store memory
         await self.memory_service.save_message(user_id, message, response["answer"], conversation_id)
 
-        # 7. Generate a quiz question for assessment
+        # 7. Generate a quiz — biased toward weak topics when available
         quiz = await self.assessment_agent.generate_quiz(
             topic=message,
             level=level,
-            insights=insights
+            insights=insights,
+            weak_topics=weak_topics,
+            strong_topics=strong_topics,
         )
 
         return {
